@@ -200,16 +200,13 @@ function updateWelcomeStats() {
   const now = new Date();
   const daySeed = Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`);
   const monthSeed = Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`);
-  const minutesToday = now.getHours() * 60 + now.getMinutes();
-  const dayProgress = minutesToday / 1440;
-  const pulse = Math.floor(now.getSeconds() / 8);
-  const dayBase = 10 + (seededNumber(daySeed) % 4);
-  const dayGrowth = Math.floor(dayProgress * (8 + (seededNumber(daySeed + 17) % 8)));
-  const today = dayBase + dayGrowth + (seededNumber(daySeed + pulse) % 2);
-  const monthBase = 108 + (seededNumber(monthSeed) % 24);
-  const monthGrowth = (now.getDate() - 1) * (2 + (seededNumber(monthSeed + 9) % 3)) + Math.floor(dayProgress * 3);
-  const monthly = monthBase + monthGrowth + (seededNumber(monthSeed + pulse) % 2);
-  const stability = 86 + (seededNumber(daySeed + now.getHours()) % 8) + (pulse % 2);
+  const dateIndex = now.getDate();
+  const dailyStep = 8 + (seededNumber(monthSeed + 17) % 8);
+  const today = 14 + (seededNumber(daySeed) % 9) + (dateIndex - 1) * dailyStep;
+  const monthBase = 108 + (seededNumber(monthSeed) % 18);
+  const monthGrowth = (dateIndex - 1) * dailyStep + Math.floor((dateIndex - 1) * (dateIndex - 2) * 0.55);
+  const monthly = monthBase + monthGrowth;
+  const stability = 93 + (seededNumber(daySeed + 93) % 4);
 
   welcomeStats.today.textContent = formatNumber(today);
   welcomeStats.monthly.textContent = formatNumber(monthly);
@@ -2704,7 +2701,6 @@ if (startWelcomeButton) {
 }
 
 updateWelcomeStats();
-window.setInterval(updateWelcomeStats, 8000);
 
 document.querySelectorAll(".journey-step").forEach((button) => {
   button.addEventListener("click", () => {
