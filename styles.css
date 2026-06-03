@@ -1706,8 +1706,7 @@ body[data-journey-step="shop"] .panel.active {
 }
 
 .coach-letter,
-.growth-system,
-.retest-tracker {
+.growth-system {
   position: relative;
   display: grid;
   gap: 9px;
@@ -1723,23 +1722,20 @@ body[data-journey-step="shop"] .panel.active {
 }
 
 .coach-letter span,
-.growth-system span,
-.retest-tracker span {
+.growth-system span {
   color: var(--accent-strong);
   font-size: 0.82rem;
   font-weight: 900;
 }
 
 .coach-letter strong,
-.growth-system strong,
-.retest-tracker strong {
+.growth-system strong {
   color: var(--ink);
   font-size: clamp(1.18rem, 2.2vw, 1.65rem);
 }
 
 .coach-letter p,
-.growth-system p,
-.retest-tracker p {
+.growth-system p {
   margin: 0;
   color: var(--muted);
   line-height: 1.65;
@@ -1756,14 +1752,7 @@ body[data-journey-step="shop"] .panel.active {
   gap: 8px;
 }
 
-.retest-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.growth-grid b,
-.retest-grid b {
+.growth-grid b {
   display: grid;
   gap: 3px;
   border: 1px solid rgba(70, 63, 55, 0.1);
@@ -1774,8 +1763,7 @@ body[data-journey-step="shop"] .panel.active {
   font-size: 1rem;
 }
 
-.growth-grid small,
-.retest-grid small {
+.growth-grid small {
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 900;
@@ -3076,8 +3064,7 @@ body[data-journey-step="shop"] .panel.active {
     width: min(180px, 100%);
   }
 
-  .growth-grid,
-  .retest-grid {
+  .growth-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3321,8 +3308,7 @@ body[data-journey-step="shop"] .panel.active {
     font-size: 0.86rem;
   }
 
-  .growth-grid,
-  .retest-grid {
+  .growth-grid {
     grid-template-columns: 1fr;
   }
 

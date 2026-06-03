@@ -112,7 +112,6 @@ const photoAdjust = {
 const fields = {
   overallScore: document.querySelector("#overallScore"),
   overallBar: document.querySelector("#overallBar"),
-  confidenceBadge: document.querySelector("#confidenceBadge"),
   hydrationScore: document.querySelector("#hydrationScore"),
   hydrationNote: document.querySelector("#hydrationNote"),
   evennessScore: document.querySelector("#evennessScore"),
@@ -131,7 +130,6 @@ const fields = {
   skinFingerprint: document.querySelector("#skinFingerprint"),
   ageBenchmark: document.querySelector("#ageBenchmark"),
   summaryList: document.querySelector("#summaryList"),
-  sampleQuality: document.querySelector("#sampleQuality"),
   sampleMode: document.querySelector("#sampleMode"),
   facePosition: document.querySelector("#facePosition"),
   lightingStatus: document.querySelector("#lightingStatus"),
@@ -142,13 +140,11 @@ const fields = {
   shoppingList: document.querySelector("#shoppingList"),
   coachLetter: document.querySelector("#coachLetter"),
   growthSystem: document.querySelector("#growthSystem"),
-  retestTracker: document.querySelector("#retestTracker"),
 };
 
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 const scoreText = (score) => Math.round(clamp(score)).toString();
 const scoreOutOf = (score) => `${scoreText(score)}/100`;
-const RETEST_STORAGE_KEY = "fascineSkinCoachRetestV1";
 const scoreStatus = (score) => {
   if (score >= 78) return "穩定維持";
   if (score >= 62) return "可微調";
@@ -239,7 +235,6 @@ function reset() {
     fields[key].textContent = "--";
   }
   fields.overallBar.style.width = "0%";
-  fields.confidenceBadge.textContent = "等待照片分析";
   fields.hydrationNote.textContent = "等待檢測";
   fields.evennessNote.textContent = "等待檢測";
   fields.rednessNote.textContent = "等待檢測";
@@ -257,10 +252,8 @@ function reset() {
   fields.skinFingerprint.innerHTML = "<span>AI 臉部膚況辨識</span><strong>等待檢測</strong><p>完成檢測後，會整理你目前偏向的肌膚狀態與保養主軸。</p>";
   fields.coachLetter.innerHTML = "<span>AI 顧問給妳的一封信</span><p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>";
   fields.growthSystem.innerHTML = "<span>肌膚成長系統</span><strong>等待建立肌膚等級</strong><p>完成檢測後，會顯示肌膚成長值與建議回測天數。</p>";
-  fields.retestTracker.innerHTML = "<span>回測追蹤</span><strong>等待建立回測基準</strong><p>完成第一次檢測後，系統會記錄本機基準；下次用相近拍攝條件回測時，會顯示變化方向。</p>";
   fields.ageBenchmark.innerHTML = "<span>同齡膚況參考</span><strong>等待年齡資料</strong><p>完成膚況問答後，這裡會顯示同年齡層建議維持的參考分數。</p>";
   fields.summaryList.innerHTML = "<p>完成檢測後，這裡會顯示你的主要肌膚觀察與保養方向。</p>";
-  fields.sampleQuality.textContent = "上傳照片後，這裡會顯示本次檢測是否適合參考。";
   fields.sampleMode.textContent = "上傳照片後，這裡會觀察肌膚的水潤與細緻感。";
   fields.facePosition.textContent = "上傳照片後，這裡會說明這次主要讀取的臉部區域。";
   fields.lightingStatus.textContent = "上傳照片後，這裡會提醒光線是否影響結果。";
@@ -934,8 +927,8 @@ function renderAndAnalyze() {
 
   if (!result) {
     window.setTimeout(() => {
-      fields.summaryList.innerHTML = "<p>這張照片可以讀取，但臉部資訊不夠清楚。建議換一張光線更明亮、臉部更置中的照片。</p>";
-      setUploadStatus("臉部資訊不夠清楚，請換一張臉部較大、光線較明亮的照片。", "error");
+      fields.summaryList.innerHTML = "<p>AI 無法確認這是一張可判讀的正面臉部照片。請重新拍攝正臉、臉部置中、光線明亮的照片後再試一次。</p>";
+      setUploadStatus("判讀失敗：未偵測到清楚正面臉部，請重新拍攝或上傳臉部照片。", "error");
       setJourneyStep("capture");
     }, 2600);
     return;
@@ -959,11 +952,14 @@ function renderPreviewOnly() {
 }
 
 function analyzeSkin() {
+  const detectedSkinBox = getSkinDetectionBox();
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const { data } = imageData;
   const pixels = [];
   const fallbackPixels = [];
   const rawPixels = [];
+  let ovalSampleCount = 0;
+  let skinCandidateCount = 0;
   const step = 3;
   const cx = canvas.width * (faceGuide.x / 100);
   const cy = canvas.height * (faceGuide.y / 100);
@@ -973,10 +969,13 @@ function analyzeSkin() {
   for (let y = 0; y < canvas.height; y += step) {
     for (let x = 0; x < canvas.width; x += step) {
       if (!isInsideFaceOval(x, y)) continue;
+      ovalSampleCount += 1;
       const index = (y * canvas.width + x) * 4;
       const r = data[index];
       const g = data[index + 1];
       const b = data[index + 2];
+      const isSkin = isLikelySkinPixel(r, g, b);
+      if (isSkin) skinCandidateCount += 1;
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
       const brightness = (r + g + b) / 3;
@@ -1001,11 +1000,11 @@ function analyzeSkin() {
         rawPixels.push(sample);
       }
 
-      if (brightness > 24 && brightness < 252 && saturation < 0.92) {
+      if (isSkin || (brightness > 38 && brightness < 238 && saturation > 0.06 && saturation < 0.72 && r > b * 0.94)) {
         fallbackPixels.push(sample);
       }
 
-      if (brightness < 32 || brightness > 248 || saturation > 0.86) continue;
+      if (!isSkin && (brightness < 44 || brightness > 238 || saturation > 0.78)) continue;
       pixels.push(sample);
     }
   }
@@ -1047,6 +1046,18 @@ function analyzeSkin() {
   }
 
   if (activePixels.length < 30) {
+    return null;
+  }
+  const skinRatio = ovalSampleCount ? skinCandidateCount / ovalSampleCount : 0;
+  const faceAreaRatio = activePixels.length / Math.max(ovalSampleCount, 1);
+  const detectedFaceRatio = detectedSkinBox
+    ? detectedSkinBox.detectedWidth / Math.max(detectedSkinBox.detectedHeight, 1)
+    : 0;
+  const detectedFaceShape = Boolean(detectedSkinBox && detectedFaceRatio > 0.42 && detectedFaceRatio < 1.35 && detectedSkinBox.points > 260);
+  const faceReadConfidence = clamp(skinRatio * 100 + Math.min(activePixels.length, 2600) / 52 + faceAreaRatio * 18, 0, 100);
+  const isValidFaceRead = detectedFaceShape && activePixels.length >= 160 && skinCandidateCount >= 90 && skinRatio >= 0.08 && mode !== "raw" && mode !== "image";
+
+  if (!isValidFaceRead) {
     return null;
   }
 
@@ -1151,19 +1162,10 @@ function analyzeSkin() {
       - Math.max(0, 2200 - activePixels.length) / 60
       - Math.max(0, Math.abs(avg.brightness - 152) - 48) * 0.55
       - Math.max(0, sideBalance - 18) * 0.9,
+      - Math.max(0, 58 - faceReadConfidence) * 0.9,
     35,
     98,
   );
-  const photoSignature = {
-    brightness: Math.round(avg.brightness),
-    variance: Math.round(variance),
-    texture: Math.round(textureEnergy * 10) / 10,
-    redness: Math.round(rednessRatio * 1000),
-    shine: Math.round(tZoneHighlightRatio * 1000),
-    dark: Math.round(darkSpotRatio * 1000),
-    side: Math.round(sideBalance),
-    mode,
-  };
 
   return {
     hydration,
@@ -1184,7 +1186,6 @@ function analyzeSkin() {
     mode,
     avgBrightness: avg.brightness,
     confidence,
-    photoSignature,
   };
 }
 
@@ -1466,122 +1467,6 @@ function buildGrowthSystem(result) {
   `;
 }
 
-function getStoredRetestRecord() {
-  try {
-    return JSON.parse(localStorage.getItem(RETEST_STORAGE_KEY) || "null");
-  } catch {
-    return null;
-  }
-}
-
-function getProfileRetestKey() {
-  if (!customerProfile) return "";
-  return [
-    customerProfile.ageValue,
-    [...(customerProfile.concernValues || [])].sort().join(","),
-    customerProfile.routineHabitValue,
-    [...(customerProfile.skinScenarioValues || [])].sort().join(","),
-    customerProfile.routinePaceValue,
-  ].join("|");
-}
-
-function getPhotoSignatureDistance(current, previous) {
-  if (!current || !previous) return Infinity;
-  return (
-    Math.abs(current.brightness - previous.brightness) * 0.45
-    + Math.abs(current.variance - previous.variance) * 0.7
-    + Math.abs(current.texture - previous.texture) * 0.9
-    + Math.abs(current.redness - previous.redness) * 0.018
-    + Math.abs(current.shine - previous.shine) * 0.018
-    + Math.abs(current.dark - previous.dark) * 0.018
-    + Math.abs(current.side - previous.side) * 0.35
-  );
-}
-
-function createRetestRecord(result) {
-  return {
-    createdAt: new Date().toISOString(),
-    profileKey: getProfileRetestKey(),
-    photoSignature: result.photoSignature,
-    scores: {
-      overall: Math.round(result.overall),
-      hydration: Math.round(result.hydration),
-      evenness: Math.round(result.evenness),
-      redness: Math.round(result.redness),
-      shine: Math.round(result.shine),
-    },
-  };
-}
-
-function saveRetestRecord(result) {
-  try {
-    localStorage.setItem(RETEST_STORAGE_KEY, JSON.stringify(createRetestRecord(result)));
-  } catch {
-    // Local storage may be disabled in some browsers; the UI still works without tracking.
-  }
-}
-
-function formatRetestDelta(value) {
-  if (Math.abs(value) < 1) return "持平";
-  return value > 0 ? `+${value}` : `${value}`;
-}
-
-function buildRetestTracker(result, previousRecord) {
-  if (!previousRecord?.scores || !previousRecord?.photoSignature) {
-    return `
-      <span>回測追蹤</span>
-      <strong>已建立本次肌膚基準</strong>
-      <p>下次請用相近光源、距離與角度重新拍攝，系統會和本次基準比較，顯示水潤、透亮、舒緩與油光控制的變化方向。</p>
-    `;
-  }
-
-  const distance = getPhotoSignatureDistance(result.photoSignature, previousRecord.photoSignature);
-  const sameProfile = previousRecord.profileKey === getProfileRetestKey();
-  const isSamePhotoLike = distance < 4;
-  const isComparable = sameProfile && distance < 28;
-
-  if (isSamePhotoLike) {
-    return `
-      <span>回測追蹤</span>
-      <strong>偵測到相同或非常接近的照片</strong>
-      <p>同一張照片反覆檢測時，分數會保持穩定，這代表系統沒有隨機製造變化。正式回測建議於 7 天後重新拍攝同光源照片。</p>
-    `;
-  }
-
-  if (!isComparable) {
-    return `
-      <span>回測追蹤</span>
-      <strong>已建立新的回測基準</strong>
-      <p>本次照片或問答條件與上一筆差異較大，系統已將這次視為新的基準。若要追蹤同一位客人的改善，建議使用相同光源、角度與問答設定回測。</p>
-    `;
-  }
-
-  const delta = {
-    overall: Math.round(result.overall) - previousRecord.scores.overall,
-    hydration: Math.round(result.hydration) - previousRecord.scores.hydration,
-    evenness: Math.round(result.evenness) - previousRecord.scores.evenness,
-    redness: Math.round(result.redness) - previousRecord.scores.redness,
-    shine: Math.round(result.shine) - previousRecord.scores.shine,
-  };
-  const trendText = delta.overall > 2
-    ? "整體狀態比上次更穩定。"
-    : delta.overall < -2
-      ? "整體狀態較上次需要再加強照護。"
-      : "整體變化接近持平，可繼續觀察細項。";
-
-  return `
-    <span>回測追蹤</span>
-    <strong>與上次回測比較：${formatRetestDelta(delta.overall)} 分</strong>
-    <p>${trendText}</p>
-    <div class="retest-grid">
-      <b><small>保濕</small>${formatRetestDelta(delta.hydration)}</b>
-      <b><small>透亮</small>${formatRetestDelta(delta.evenness)}</b>
-      <b><small>舒緩</small>${formatRetestDelta(delta.redness)}</b>
-      <b><small>控光</small>${formatRetestDelta(delta.shine)}</b>
-    </div>
-  `;
-}
-
 function getAgeBenchmark(result) {
   const ageValue = customerProfile?.ageValue || "30s";
   const benchmarks = {
@@ -1605,6 +1490,48 @@ function getAgeBenchmark(result) {
     gap,
     status,
     suggestion,
+  };
+}
+
+function getCareRhythmInsight(result) {
+  const lowMetrics = getMetricRanking(result).slice(0, 2).map(([key]) => key);
+  const hasStressLoad = hasLifeFactor("sleep") || hasLifeFactor("stress") || hasLifeFactor("busy") || hasLifeFactor("selfcare");
+  const prefersSimple = customerProfile?.routinePaceValue === "simple" || customerProfile?.routinePaceValue === "flexible";
+  const wantsMoreCare = ["intensive", "completeCare"].includes(customerProfile?.routinePaceValue);
+
+  if (lowMetrics.includes("redness") || hasStressLoad) {
+    return {
+      title: "修護節奏",
+      tip: "目前比較適合先降低保養刺激感，把補水、舒緩與鎖水固定 7 天，再逐步加入提亮或加強型產品。",
+    };
+  }
+
+  if (lowMetrics.includes("shine")) {
+    return {
+      title: "油水平衡",
+      tip: "建議不要只做去油，先用清爽補水穩住肌膚，再把 T 字與兩頰分區調整，妝前狀態會更穩。",
+    };
+  }
+
+  if (lowMetrics.includes("evenness")) {
+    return {
+      title: "透亮節奏",
+      tip: "白天防護與晚間提亮要一起做，先穩定防曬，再安排溫和亮膚保養，膚色均勻度會更好追蹤。",
+    };
+  }
+
+  if (wantsMoreCare) {
+    return {
+      title: "進階照護",
+      tip: "肌膚可以接受更完整的保養節奏，但加強型產品建議分天加入，避免一次疊太多造成負擔。",
+    };
+  }
+
+  return {
+    title: prefersSimple ? "高效保養節奏" : "日常維持節奏",
+    tip: prefersSimple
+      ? "目前適合把流程維持在清潔、補水、防護與夜間修護，先用少步驟做出穩定感。"
+      : "目前可以維持早晚基礎保養，並依當週膚況微調保濕、提亮與防護的比例。",
   };
 }
 
@@ -2237,12 +2164,10 @@ function buildFascineRoutine(result) {
 }
 
 function updateResults(result) {
-  const previousRetestRecord = getStoredRetestRecord();
   lastResult = result;
   fields.overallScore.textContent = scoreOutOf(result.overall);
   fields.overallBar.style.width = pct(result.overall);
   const confidenceLabel = result.confidence >= 82 ? "高" : result.confidence >= 64 ? "中" : "低";
-  fields.confidenceBadge.textContent = `${scoreStatus(result.overall)}｜照片可信度 ${confidenceLabel}`;
 
   fields.hydrationScore.textContent = scoreOutOf(result.hydration);
   fields.evennessScore.textContent = scoreOutOf(result.evenness);
@@ -2286,7 +2211,6 @@ function updateResults(result) {
     : "妝前狀態相對穩定，維持輕薄防護與規律保濕即可。";
   const calmTip = result.redness < 58 ? "泛紅較明顯時，先簡化保養、降低刺激。" : "舒緩穩定度尚可。";
 
-  fields.sampleQuality.innerHTML = `<span class="detail-status">${confidenceLabel}可信度</span>本次照片清晰度${quality}，${confidenceLabel === "低" ? "結果可先當初步參考，建議重拍後再確認。" : "可以作為本次保養建議依據。"}`;
   fields.sampleMode.innerHTML = `<span class="detail-status">${hydrationLabel}</span>${labelFor(result.hydration, "肌膚表面看起來較平整，保濕維持度不錯。", "局部有乾紋或粗糙感，建議補水後再鎖水。", "乾燥紋理較明顯，建議把保濕修護排在第一優先。")}`;
   fields.facePosition.innerHTML = `<span class="detail-status">${readAreaLabel}</span>${modeLabel}。${careZoneTip}`;
   fields.lightingStatus.innerHTML = `<span class="detail-status">${lightLabel}</span>${lightTip}`;
@@ -2299,21 +2223,7 @@ function updateResults(result) {
     ["redness", result.redness, "泛紅", "降低刺激，優先使用舒緩與屏障修護。"],
     ["shine", result.shine, "油光", "保留保濕，改用輕質乳液與分區控油。"],
   ].sort((a, b) => a[1] - b[1]);
-
-  const photoTip = result.confidence < 64
-    ? [{
-        score: result.confidence,
-        title: "照片品質",
-        tip: "建議在窗邊自然光、正臉、臉部佔畫面約 60% 後再測一次，分數會更可靠。",
-      }]
-    : [];
-  const profileTip = customerProfile?.concernLabel
-    ? [{
-        hideScore: true,
-        title: "自填膚況",
-        tip: `${customerProfile.ageLabel}，最在意${customerProfile.concernLabel}；目前${customerProfile.routineHabitLabel}，期待${customerProfile.skinScenarioLabel}，偏好${customerProfile.routinePaceLabel}。`,
-      }]
-    : [];
+  const careRhythm = getCareRhythmInsight(result);
 
   const fingerprint = getSkinFingerprint(result);
   const benchmark = getAgeBenchmark(result);
@@ -2329,7 +2239,6 @@ function updateResults(result) {
   `;
   fields.coachLetter.innerHTML = buildCoachLetter(result, fingerprint);
   fields.growthSystem.innerHTML = buildGrowthSystem(result);
-  fields.retestTracker.innerHTML = buildRetestTracker(result, previousRetestRecord);
   fields.ageBenchmark.innerHTML = `
     <span>${customerProfile?.ageLabel || "同齡"}膚況分數比較</span>
     <div class="benchmark-compare">
@@ -2343,8 +2252,7 @@ function updateResults(result) {
 
   fields.summaryList.innerHTML = priorities
     .slice(0, 3)
-    .concat(profileTip)
-    .concat(photoTip)
+    .concat([{ hideScore: true, title: careRhythm.title, tip: careRhythm.tip }])
     .map(
       (item) => {
         const score = Array.isArray(item) ? item[1] : item.score;
@@ -2368,14 +2276,12 @@ function updateResults(result) {
   lastRecommendedProducts = recommendedProducts;
   renderProductRecommendations(recommendedProducts, shopProfile);
   renderRoutineRecommendations(result);
-  saveRetestRecord(result);
   if (copyReportButton) copyReportButton.disabled = false;
 }
 
 function buildCustomerReport() {
   if (!lastResult) return "";
 
-  const confidenceLabel = lastResult.confidence >= 82 ? "高" : lastResult.confidence >= 64 ? "中" : "低";
   const fingerprint = getSkinFingerprint(lastResult);
   const sortedMetrics = [
     ["水潤感", lastResult.hydration],
@@ -2388,7 +2294,6 @@ function buildCustomerReport() {
     "FASCINÉ 梵希婗肌膚保養建議",
     "",
     `整體膚況：${scoreText(lastResult.overall)} 分`,
-    `檢測可信度：${confidenceLabel}`,
     `AI 膚況辨識：${fingerprint.type}`,
     `本次主軸：${fingerprint.primaryLabel}，第二重點：${fingerprint.secondaryLabel}`,
     customerProfile?.concernLabel ? `客人自填：${customerProfile.ageLabel}｜最困擾 ${customerProfile.concernLabel}｜${customerProfile.routineHabitLabel}｜期待${customerProfile.skinScenarioLabel}｜偏好${customerProfile.routinePaceLabel}` : "",
