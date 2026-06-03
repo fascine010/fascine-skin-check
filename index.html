@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FASCINÉ 肌膚檢測</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="welcome-panel" id="welcomePanel" aria-label="肌膚對話室">
+        <p class="eyebrow">FASCINÉ AI Skin Coach</p>
+        <h1>歡迎來到肌膚對話室</h1>
+        <div class="welcome-copy">
+          <p>很多時候，</p>
+          <p>不是妳不會保養，</p>
+          <p>而是肌膚正在用自己的方式告訴妳：</p>
+          <strong>它累了。</strong>
+          <strong>它缺水了。</strong>
+          <strong>它需要被理解了。</strong>
+          <p>花 3 分鐘，一起聽聽肌膚想說什麼。</p>
+        </div>
+        <button class="primary-action welcome-start" id="startWelcomeButton" type="button">開始了解我的肌膚</button>
+      </section>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">FASCINÉ Skin Check</p>
+            <h1>肌膚狀態檢測</h1>
+            <p class="top-subtitle">請拍攝或上傳您的臉部照片。AI 顧問將分析您當前的膚況，量身打造專屬的保養對策。</p>
+          </div>
+          <div class="top-meta" aria-label="檢測特色">
+            <span>AI Smart Skin Analysis</span>
+            <span>照片僅供本次檢測使用</span>
+          </div>
+        </header>
+
+        <nav class="journey-steps" aria-label="檢測流程">
+          <button class="journey-step active" type="button" data-journey-target="capture" data-step-index="01" data-step-title="臉部拍攝">
+            <span id="journeyStepCount">Step 01 / 05</span>
+            <strong id="journeyStepTitle">臉部拍攝</strong>
+            <small id="journeyStepHint">請拍照或上傳您的正面清晰照片，讓 AI 顧問為您深度分析膚況。</small>
+          </button>
+          <div class="journey-progress" aria-hidden="true">
+            <i id="journeyProgressBar"></i>
+          </div>
+        </nav>
+
+        <section class="scanner" aria-label="照片檢測區">
+          <div class="photo-panel">
+            <canvas id="photoCanvas" width="960" height="960" aria-label="上傳照片預覽"></canvas>
+            <div class="empty-state" id="emptyState">
+              <span class="scan-mark"></span>
+              <strong>選擇您的檢測方式</strong>
+              <span>請於自然光環境中拍攝，並將臉部置中以提升準確度。</span>
+            </div>
+          </div>
+
+          <aside class="control-panel">
+            <div class="upload-actions">
+              <label class="upload-box" for="imageInput">
+                <input id="imageInput" type="file" accept="image/*" />
+                <span>從相簿選擇</span>
+                <small>上傳照片</small>
+              </label>
+              <label class="upload-box camera-box" for="cameraInput">
+                <input id="cameraInput" type="file" accept="image/*" capture="user" />
+                <span>立即拍照</span>
+                <small>開啟前鏡頭進行 AI 檢測</small>
+              </label>
+            </div>
+            <small class="upload-status" id="uploadStatus">照片僅供本次檢測使用，不會公開或儲存於雲端資料庫，敬請安心。</small>
+
+            <div class="meter-card primary">
+              <span>本次肌膚參考分數</span>
+              <strong id="overallScore">--</strong>
+              <small id="confidenceBadge">等待照片分析</small>
+              <div class="score-bar">
+                <span id="overallBar"></span>
+              </div>
+            </div>
+
+            <div class="align-card">
+              <div class="align-heading">
+                <strong>精準定位</strong>
+                <button id="autoAlignButton" type="button">自動校正</button>
+              </div>
+              <small>已自動校準並鎖定檢測框；如需微調，請使用下方滑桿，將臉部完整對齊檢測框。</small>
+              <details class="advanced-align">
+                <summary>進階微調</summary>
+                <label>
+                  水平位移
+                  <input id="faceX" type="range" min="22" max="78" value="50" />
+                </label>
+                <label>
+                  垂直位移
+                  <input id="faceY" type="range" min="24" max="76" value="51" />
+                </label>
+                <label>
+                  框架寬度
+                  <input id="faceWidth" type="range" min="18" max="44" value="29" />
+                </label>
+                <label>
+                  框架高度
+                  <input id="faceHeight" type="range" min="28" max="48" value="38" />
+                </label>
+              </details>
+            </div>
+
+            <div class="metrics-grid">
+              <article class="metric-card">
+                <span>水潤感</span>
+                <strong id="hydrationScore">--</strong>
+                <small id="hydrationNote">等待照片</small>
+              </article>
+              <article class="metric-card">
+                <span>均勻度</span>
+                <strong id="evennessScore">--</strong>
+                <small id="evennessNote">等待照片</small>
+              </article>
+              <article class="metric-card">
+                <span>泛紅</span>
+                <strong id="rednessScore">--</strong>
+                <small id="rednessNote">等待照片</small>
+              </article>
+              <article class="metric-card">
+                <span>油光</span>
+                <strong id="shineScore">--</strong>
+                <small id="shineNote">等待照片</small>
+              </article>
+            </div>
+          </aside>
+        </section>
+
+        <div class="journey-actions">
+          <button class="primary-action" id="viewResultButton" type="button" disabled>下一步：膚況諮詢</button>
+          <button class="secondary-action" id="retakeButton" type="button">重新拍攝／上傳照片</button>
+        </div>
+      </section>
+
+      <section class="consultation-panel" id="consultationPanel" aria-label="膚況問答">
+        <div class="panel-title">
+          <p class="eyebrow">Step 02 / Skin Consultation</p>
+          <h2>客製化膚況問答</h2>
+          <span>AI 顧問將綜合您的日常習慣與影像分析結果，整理成專屬保養提案。</span>
+        </div>
+        <form class="consultation-form" id="consultationForm">
+          <fieldset class="question-card">
+            <legend>01 妳最近常常感覺？ <small>可複選</small></legend>
+            <div class="option-grid">
+              <label><input type="checkbox" name="lifeFactor" value="sleep" /> 睡不飽</label>
+              <label><input type="checkbox" name="lifeFactor" value="stress" /> 壓力大</label>
+              <label><input type="checkbox" name="lifeFactor" value="busy" /> 工作忙</label>
+              <label><input type="checkbox" name="lifeFactor" value="diet" /> 飲食不規律</label>
+              <label><input type="checkbox" name="lifeFactor" value="ac" /> 經常吹冷氣</label>
+              <label><input type="checkbox" name="lifeFactor" value="selfcare" /> 最近很少照顧自己</label>
+            </div>
+            <p class="question-insight">其實很多肌膚問題，並不是保養品造成，而是生活習慣累積的結果。</p>
+          </fieldset>
+
+          <fieldset class="question-card">
+            <legend>02 年齡區間</legend>
+            <div class="option-grid age-options">
+              <label><input type="radio" name="ageRange" value="under20" /> 20 歲 以下</label>
+              <label><input type="radio" name="ageRange" value="20s" checked /> 20-29 歲</label>
+              <label><input type="radio" name="ageRange" value="30s" /> 30-39 歲</label>
+              <label><input type="radio" name="ageRange" value="40s" /> 40-49 歲</label>
+              <label><input type="radio" name="ageRange" value="50up" /> 50 歲以上</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="question-card">
+            <legend>03 您目前最在意的肌膚困擾 <small>可複選</small></legend>
+            <div class="option-grid">
+              <label><input type="checkbox" name="skinConcern" value="hydration" /> 乾燥粗糙與緊繃</label>
+              <label><input type="checkbox" name="skinConcern" value="evenness" /> 黯沉蠟黃與疲態</label>
+              <label><input type="checkbox" name="skinConcern" value="redness" /> 泛紅不適與敏弱</label>
+              <label><input type="checkbox" name="skinConcern" value="shine" /> 油光泛濫與痘痘</label>
+              <label><input type="checkbox" name="skinConcern" value="texture" /> 毛孔粗大與粗糙</label>
+              <label><input type="checkbox" name="skinConcern" value="fineLines" /> 細紋與缺乏彈性</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="question-card">
+            <legend>04 目前的保養習慣</legend>
+            <div class="option-grid">
+              <label><input type="radio" name="routineHabit" value="minimal" /> 極簡清潔：僅使用洗面乳，無後續保養。</label>
+              <label><input type="radio" name="routineHabit" value="basic" checked /> 基礎保濕：化妝水或乳液，做基本補水。</label>
+              <label><input type="radio" name="routineHabit" value="complete" /> 進階護理：習慣使用精華液、乳霜、防曬等品項。</label>
+              <label><input type="radio" name="routineHabit" value="antioxidant" /> 高效抗氧：除上述外，會定期使用面膜、眼霜或精華油。</label>
+              <label><input type="radio" name="routineHabit" value="clinical" /> 醫美或機能保養：使用A醇、高濃度酸類或醫美療程修護。</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="question-card">
+            <legend>05 最希望達到的狀態 <small>可複選</small></legend>
+            <div class="option-grid">
+              <label><input type="checkbox" name="skinScenario" value="bare" checked /> 素顏精緻感：不上妝也能透出健康光澤。</label>
+              <label><input type="checkbox" name="skinScenario" value="stress" /> 告別壓力肌：熬夜、生理期後，肌膚不再暗沉疲憊。</label>
+              <label><input type="checkbox" name="skinScenario" value="season" /> 提升防護力：揮別換季敏感，維持穩定狀態。</label>
+              <label><input type="checkbox" name="skinScenario" value="ageing" /> 視覺逆齡感：緊緻輪廓，淡化歲月紋路。</label>
+              <label><input type="checkbox" name="skinScenario" value="makeup" /> 持效完美度：改善卡粉、脫妝，讓妝感更服貼持久。</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="question-card">
+            <legend>06 您可接受的保養步驟</legend>
+            <div class="option-grid">
+              <label><input type="radio" name="routinePace" value="simple" checked /> 3步內極簡保養：追求高效，出門或睡前簡單搞定。</label>
+              <label><input type="radio" name="routinePace" value="daily" /> 早晚基礎保養：習慣早晚各3-4步驟的儀式感。</label>
+              <label><input type="radio" name="routinePace" value="intensive" /> 加強保養：願意在特定天數加入精華液、面膜。</label>
+              <label><input type="radio" name="routinePace" value="completeCare" /> 全方位護膚：不怕步驟麻煩，以改善膚況為優先。</label>
+              <label><input type="radio" name="routinePace" value="flexible" /> 視當天膚況調整：偏好彈性增減步驟的保養方式。</label>
+            </div>
+          </fieldset>
+        </form>
+        <div class="journey-actions">
+          <button class="secondary-action" id="backToPhotoButton" type="button">回到照片調整</button>
+          <button class="primary-action" id="startAnalysisButton" type="button" disabled>開始 AI 肌膚解讀</button>
+        </div>
+      </section>
+
+      <section class="analysis-progress" id="analysisProgress" hidden>
+        <div class="analysis-face-card" aria-label="AI 正在讀取臉部照片">
+          <img id="analysisFacePreview" alt="本次臉部分析預覽" />
+          <span class="analysis-face-grid"></span>
+          <span class="analysis-face-sweep"></span>
+        </div>
+        <div>
+          <p class="eyebrow">Analyzing your skin parameters</p>
+          <h2>正在分析您的肌膚狀態</h2>
+          <ul>
+            <li>分析膚況問答內容 Cross-referencing consultation data with visual report</li>
+            <li>分析當前肌膚狀態 Evaluating current skin barrier strength</li>
+            <li>準備生成 FASCINÉ Generating your bespoke FASCINÉ Skin Report</li>
+          </ul>
+          <div class="analysis-live-bars" aria-hidden="true">
+            <span style="--w: 72%; --d: 0s"><b>水潤程度分析 Hydration Levels</b></span>
+            <span style="--w: 64%; --d: .18s"><b>膚色光澤分析 Radiance & Tone</b></span>
+            <span style="--w: 58%; --d: .36s"><b>敏弱狀態分析 Sensitivity & Redness</b></span>
+            <span style="--w: 76%; --d: .54s"><b>油光紋路掃描 Sebum & Fine Lines</b></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage-transition" id="stageTransition" hidden aria-live="polite">
+        <div class="stage-card">
+          <div class="stage-visual" aria-hidden="true">
+            <svg class="stage-face-map" viewBox="0 0 140 170">
+              <defs>
+                <linearGradient id="stageFaceLine" x1="24" x2="116" y1="24" y2="150" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#FFFFFF" />
+                  <stop offset="0.42" stop-color="#8A6A55" />
+                  <stop offset="1" stop-color="#C9857A" />
+                </linearGradient>
+              </defs>
+              <path class="stage-face-aura" d="M31 76C31 40 48 24 70 24C92 24 109 40 109 76C109 116 91 148 70 153C49 148 31 116 31 76Z" />
+              <path class="stage-face-outline" d="M70 29C93 29 106 49 104 79C101 119 86 145 70 151C54 145 39 119 36 79C34 49 47 29 70 29Z" />
+              <path class="stage-face-soft" d="M48 73C54 67 62 66 67 71M73 71C78 66 86 67 92 73M55 111C62 117 78 117 85 111" />
+              <path class="stage-face-lines" d="M70 38L48 67L40 89L56 120L70 145L84 120L100 89L92 67L70 38ZM48 67L59 84L70 38L81 84L92 67M59 84L56 120L70 101L84 120L81 84M40 89H100M70 38V145M48 67L70 101L92 67M56 120L84 120" />
+              <path class="stage-face-glow" d="M42 90C51 84 60 82 70 82C80 82 89 84 98 90" />
+              <circle cx="70" cy="38" r="3.2" />
+              <circle cx="48" cy="67" r="2.7" />
+              <circle cx="92" cy="67" r="2.7" />
+              <circle cx="59" cy="84" r="2.8" />
+              <circle cx="81" cy="84" r="2.8" />
+              <circle cx="40" cy="89" r="2.6" />
+              <circle cx="100" cy="89" r="2.6" />
+              <circle cx="70" cy="101" r="3.1" />
+              <circle cx="56" cy="120" r="2.8" />
+              <circle cx="84" cy="120" r="2.8" />
+              <circle cx="70" cy="145" r="3.2" />
+            </svg>
+            <span class="stage-orbit"></span>
+            <span class="stage-core"></span>
+            <span class="stage-scan-line"></span>
+            <i></i><i></i><i></i><i></i>
+            <div class="stage-product-stack" aria-hidden="true">
+              <img src="assets/stage-products/the-pure.png" alt="" />
+              <img src="assets/stage-products/the-lotion.png" alt="" />
+              <img src="assets/stage-products/the-cream.png" alt="" />
+              <img src="assets/stage-products/sun-cream.png" alt="" />
+            </div>
+            <div class="stage-product-stack stage-shop-stack" aria-hidden="true">
+              <img src="assets/stage-products/vital-c.png" alt="" />
+              <img src="assets/stage-products/the-lotion.png" alt="" />
+              <img src="assets/stage-products/the-serum-30.png" alt="" />
+              <img src="assets/stage-products/sun-cream.png" alt="" />
+            </div>
+          </div>
+          <p class="eyebrow">FASCINÉ AI PROCESS</p>
+          <h2 id="stageTitle">正在處理</h2>
+          <div class="stage-status" aria-hidden="true">
+            <span>FACE MAP</span>
+            <span>SKIN DATA</span>
+            <span>ROUTINE AI</span>
+          </div>
+          <ul id="stageSteps">
+            <li>讀取本次資料</li>
+            <li>建立膚況參考</li>
+            <li>準備下一步畫面</li>
+          </ul>
+          <div class="stage-loader" aria-hidden="true"><i></i></div>
+        </div>
+      </section>
+
+      <section class="insights">
+        <section class="panel active" id="summary" aria-label="AI 膚況解析">
+          <div class="panel-title">
+            <p class="eyebrow">Step 03 / AI Result</p>
+            <h2>FASCINÉ AI 顧問檢測報告</h2>
+          </div>
+          <div class="analysis-visual">
+            <div class="face-scan-widget" aria-label="AI 臉部掃描">
+              <img class="scan-face-photo" src="assets/scan-face-woman.png" alt="AI 臉部掃描示意" />
+              <svg class="face-mesh" id="faceMesh" viewBox="0 0 180 220" aria-hidden="true">
+                <path class="mesh-face" d="M90 28C127 30 150 61 150 109C148 170 123 214 90 218C57 214 32 170 30 109C30 61 53 30 90 28Z" />
+                <path d="M56 76L90 54L124 76L142 118L116 166L90 218L64 166L38 118Z" />
+                <path d="M56 76L64 166M124 76L116 166M90 54L90 218M38 118L142 118M64 166L116 166" />
+                <path d="M56 76L72 108L90 54L108 108L124 76M72 108L64 166L90 142L116 166L108 108M64 166L90 218L116 166" />
+                <circle class="mesh-dot" cx="90" cy="54" r="3.6" style="--d: 0s" />
+                <circle class="mesh-dot" cx="56" cy="76" r="3.6" style="--d: .12s" />
+                <circle class="mesh-dot" cx="124" cy="76" r="3.6" style="--d: .24s" />
+                <circle class="mesh-dot" cx="72" cy="108" r="3.2" style="--d: .36s" />
+                <circle class="mesh-dot" cx="108" cy="108" r="3.2" style="--d: .48s" />
+                <circle class="mesh-dot" cx="38" cy="118" r="3.5" style="--d: .6s" />
+                <circle class="mesh-dot" cx="90" cy="142" r="3.4" style="--d: .72s" />
+                <circle class="mesh-dot" cx="142" cy="118" r="3.5" style="--d: .84s" />
+                <circle class="mesh-dot" cx="64" cy="166" r="3.4" style="--d: .96s" />
+                <circle class="mesh-dot" cx="116" cy="166" r="3.4" style="--d: 1.08s" />
+                <circle class="mesh-dot" cx="90" cy="218" r="3.8" style="--d: 1.2s" />
+              </svg>
+              <span class="scan-sweep"></span>
+            </div>
+            <div class="signal-grid">
+              <div class="signal-row">
+                <span>肌膚保濕度</span>
+                <b id="hydrationSignal"></b>
+              </div>
+              <div class="signal-row">
+                <span>透亮與光澤度</span>
+                <b id="evennessSignal"></b>
+              </div>
+              <div class="signal-row">
+                <span>肌膚防禦力／敏弱度</span>
+                <b id="rednessSignal"></b>
+              </div>
+              <div class="signal-row">
+                <span>皮脂平衡狀態</span>
+                <b id="shineSignal"></b>
+              </div>
+              <div class="scan-info-card">
+                <strong>AI Diagnostic Parameters</strong>
+                <span>AI 觀察指標</span>
+                <span>臉部精準定位</span>
+                <span>光源環境檢測</span>
+                <span>色調均勻度</span>
+                <span>皮脂分泌區域</span>
+              </div>
+            </div>
+          </div>
+          <div class="skin-fingerprint" id="skinFingerprint">
+            <span>AI 臉部膚況辨識</span>
+            <strong>等待檢測</strong>
+            <p>完成檢測後，會整理你目前偏向的肌膚狀態與保養主軸。</p>
+          </div>
+          <div class="coach-letter" id="coachLetter">
+            <span>AI 顧問給妳的一封信</span>
+            <p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>
+          </div>
+          <div class="growth-system" id="growthSystem">
+            <span>肌膚成長系統</span>
+            <strong>等待建立肌膚等級</strong>
+            <p>完成檢測後，會顯示肌膚成長值與建議回測天數。</p>
+          </div>
+          <div class="retest-tracker" id="retestTracker">
+            <span>回測追蹤</span>
+            <strong>等待建立回測基準</strong>
+            <p>完成第一次檢測後，系統會記錄本機基準；下次用相近拍攝條件回測時，會顯示變化方向。</p>
+          </div>
+          <div class="age-benchmark" id="ageBenchmark">
+            <span>同齡膚況參考</span>
+            <strong>等待年齡資料</strong>
+            <p>完成膚況問答後，這裡會顯示同年齡層建議維持的參考分數。</p>
+          </div>
+          <div class="summary-list" id="summaryList">
+            <p>完成檢測後，這裡會顯示你的主要肌膚觀察與保養方向。</p>
+          </div>
+          <div class="result-actions">
+            <button class="secondary-action" type="button" data-go-step="consult">返回上一步</button>
+            <button class="primary-action" type="button" data-go-panel="routine">查看保養流程</button>
+          </div>
+        </section>
+
+        <section class="panel" id="details" aria-label="肌膚觀察">
+          <div class="panel-title">
+            <p class="eyebrow">Skin Detail</p>
+            <h2>肌膚觀察</h2>
+          </div>
+          <div class="detail-grid">
+            <article>
+              <span class="dot calm"></span>
+              <strong>檢測可信度</strong>
+              <p id="sampleQuality">尚未開始</p>
+            </article>
+            <article>
+              <span class="dot calm"></span>
+              <strong>水潤飽滿感</strong>
+              <p id="sampleMode">尚未開始</p>
+            </article>
+            <article>
+              <span class="dot calm"></span>
+              <strong>保養吸收區</strong>
+              <p id="facePosition">尚未開始</p>
+            </article>
+            <article>
+              <span class="dot bright"></span>
+              <strong>拍攝光線</strong>
+              <p id="lightingStatus">尚未開始</p>
+            </article>
+            <article>
+              <span class="dot warm"></span>
+              <strong>膚色透亮度</strong>
+              <p id="colorVariance">尚未開始</p>
+            </article>
+            <article>
+              <span class="dot bright"></span>
+              <strong>妝前穩定度</strong>
+              <p id="highlightRatio">尚未開始</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel" id="routine" aria-label="保養流程">
+          <div class="panel-title">
+            <p class="eyebrow">Step 04 / Skincare Routine</p>
+            <h2>保養建議</h2>
+            <span>AI 顧問已為您規劃出最適合當前膚況的早晚縮時高效公式。</span>
+          </div>
+          <div class="routine-switch" aria-label="日夜保養切換">
+            <button class="active" type="button" data-routine-tab="day">☀ 日間防禦 <small>Day</small></button>
+            <button type="button" data-routine-tab="night">☾ 夜間修護 <small>Night</small></button>
+          </div>
+          <div class="routine-list" id="routineList">
+            <p>先上傳一張正面照片，完成問答後會整理早晚保養流程。</p>
+          </div>
+          <div class="result-actions">
+            <button class="secondary-action" type="button" data-go-panel="summary">返回檢測結果</button>
+            <button class="primary-action" type="button" data-go-panel="shop">查看購買推薦</button>
+          </div>
+        </section>
+
+        <section class="panel" id="shop" aria-label="購買推薦">
+          <div class="panel-title">
+            <p class="eyebrow">Step 05 / Shop</p>
+            <h2>建議購買</h2>
+          </div>
+          <div class="shop-panel-head">
+            <div>
+              <strong>根據本次 AI 智能檢測報告與您的肌膚需求，為您精選 FASCINÉ 專屬商品清單。</strong>
+              <p>推薦商品會依照核心問題、問答情境與保養步驟排序。</p>
+            </div>
+          </div>
+          <div class="shop-profile" id="shopProfile">
+            <strong>等待肌膚檢測</strong>
+            <p>完成檢測後，這裡會顯示本次保養主軸，讓每位客人的商品查看順序更有差異。</p>
+          </div>
+          <div class="product-grid" id="shoppingList">
+            <p>完成檢測後，這裡會出現建議商品與購買連結。</p>
+          </div>
+          <div class="result-actions">
+            <button class="secondary-action" type="button" data-go-panel="routine">返回保養流程</button>
+            <button class="primary-action" type="button" data-reset-flow>重新檢測</button>
+          </div>
+        </section>
+      </section>
+
+      <p class="notice">
+        本檢測提供日常保養參考，不等同皮膚科診斷。若有疼痛、發炎、快速惡化或疑似疾病，請諮詢專業醫師。
+      </p>
+
+      <section class="camera-modal" id="cameraModal" aria-label="立即拍照" hidden>
+        <div class="camera-sheet">
+          <div class="camera-head">
+            <strong>拍攝檢測照片</strong>
+            <button id="closeCameraButton" type="button">關閉</button>
+          </div>
+          <div class="camera-preview-frame">
+            <video id="cameraPreview" autoplay playsinline muted></video>
+            <span class="camera-face-guide" aria-hidden="true"></span>
+            <span class="camera-center-line" aria-hidden="true"></span>
+          </div>
+          <p id="cameraStatus">請允許瀏覽器使用相機，並讓臉部置中。</p>
+          <div class="camera-actions">
+            <button id="captureButton" type="button">開始分析這張</button>
+            <button id="fallbackUploadButton" type="button">改用相簿照片</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
