@@ -211,6 +211,57 @@ input {
   font-size: 1.08em;
 }
 
+.welcome-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 860px;
+  margin-top: 4px;
+}
+
+.welcome-stats article {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(70, 63, 55, 0.12);
+  border-radius: 20px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(235, 200, 193, 0.28), transparent 9rem),
+    rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-soft);
+}
+
+.welcome-stats article::after {
+  content: "";
+  position: absolute;
+  inset: auto 14px 10px 14px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--alert), var(--champagne));
+  opacity: 0.62;
+}
+
+.welcome-stats span {
+  display: block;
+  min-height: 2.8em;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.welcome-stats strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: clamp(1.55rem, 3.2vw, 2.45rem);
+  line-height: 1;
+}
+
+.welcome-stats b {
+  font-variant-numeric: tabular-nums;
+}
+
 .welcome-start {
   width: fit-content;
   min-width: min(100%, 280px);
@@ -3135,6 +3186,25 @@ body[data-journey-step="shop"] .panel.active {
     gap: 6px;
     font-size: 1rem;
     line-height: 1.68;
+  }
+
+  .welcome-stats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .welcome-stats article {
+    border-radius: 16px;
+    padding: 13px;
+  }
+
+  .welcome-stats span {
+    min-height: 0;
+    font-size: 0.78rem;
+  }
+
+  .welcome-stats strong {
+    font-size: 1.45rem;
   }
 
   .welcome-start {

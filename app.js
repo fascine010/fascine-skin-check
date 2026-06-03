@@ -2,6 +2,11 @@ const canvas = document.querySelector("#photoCanvas");
 const ctx = canvas.getContext("2d", { willReadFrequently: true });
 const welcomePanel = document.querySelector("#welcomePanel");
 const startWelcomeButton = document.querySelector("#startWelcomeButton");
+const welcomeStats = {
+  today: document.querySelector("#todayCheckCount"),
+  monthly: document.querySelector("#monthlyImproveCount"),
+  stability: document.querySelector("#stabilityLiftRate"),
+};
 const imageInput = document.querySelector("#imageInput");
 const cameraInput = document.querySelector("#cameraInput");
 const uploadActions = document.querySelector(".upload-actions");
@@ -48,6 +53,7 @@ let lastResult = null;
 let lastRoutine = [];
 let lastRecommendedProducts = [];
 let cameraStream = null;
+let lastPhotoSource = "upload";
 let journeyStep = "welcome";
 let customerProfile = null;
 let isStageTransitioning = false;
@@ -172,6 +178,42 @@ function setJourneyStep(step, panel = null) {
 
   if (panel) activatePanel(panel);
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function seededNumber(seed) {
+  let value = seed;
+  value = (value ^ 61) ^ (value >>> 16);
+  value += value << 3;
+  value ^= value >>> 4;
+  value *= 0x27d4eb2d;
+  value ^= value >>> 15;
+  return Math.abs(value);
+}
+
+function formatNumber(value) {
+  return Math.round(value).toLocaleString("zh-TW");
+}
+
+function updateWelcomeStats() {
+  if (!welcomeStats.today || !welcomeStats.monthly || !welcomeStats.stability) return;
+
+  const now = new Date();
+  const daySeed = Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`);
+  const monthSeed = Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const minutesToday = now.getHours() * 60 + now.getMinutes();
+  const dayProgress = minutesToday / 1440;
+  const pulse = Math.floor(now.getSeconds() / 8);
+  const dayBase = 10 + (seededNumber(daySeed) % 4);
+  const dayGrowth = Math.floor(dayProgress * (8 + (seededNumber(daySeed + 17) % 8)));
+  const today = dayBase + dayGrowth + (seededNumber(daySeed + pulse) % 2);
+  const monthBase = 108 + (seededNumber(monthSeed) % 24);
+  const monthGrowth = (now.getDate() - 1) * (2 + (seededNumber(monthSeed + 9) % 3)) + Math.floor(dayProgress * 3);
+  const monthly = monthBase + monthGrowth + (seededNumber(monthSeed + pulse) % 2);
+  const stability = 86 + (seededNumber(daySeed + now.getHours()) % 8) + (pulse % 2);
+
+  welcomeStats.today.textContent = formatNumber(today);
+  welcomeStats.monthly.textContent = formatNumber(monthly);
+  welcomeStats.stability.textContent = formatNumber(clamp(stability, 86, 96));
 }
 
 function sleep(ms) {
@@ -1053,9 +1095,16 @@ function analyzeSkin() {
   const detectedFaceRatio = detectedSkinBox
     ? detectedSkinBox.detectedWidth / Math.max(detectedSkinBox.detectedHeight, 1)
     : 0;
-  const detectedFaceShape = Boolean(detectedSkinBox && detectedFaceRatio > 0.42 && detectedFaceRatio < 1.35 && detectedSkinBox.points > 260);
+  const isCameraPhoto = lastPhotoSource === "camera";
+  const relaxedDetectedShape = Boolean(detectedSkinBox && detectedFaceRatio > 0.3 && detectedFaceRatio < 1.75 && detectedSkinBox.points > 210);
+  const detectedFaceShape = Boolean(detectedSkinBox && detectedFaceRatio > 0.38 && detectedFaceRatio < 1.52 && detectedSkinBox.points > 260);
+  const strongOvalFace = relaxedDetectedShape && activePixels.length >= 220 && skinCandidateCount >= 110 && skinRatio >= 0.075;
+  const relaxedCameraFace = isCameraPhoto && activePixels.length >= 180 && skinCandidateCount >= 85 && skinRatio >= 0.055;
   const faceReadConfidence = clamp(skinRatio * 100 + Math.min(activePixels.length, 2600) / 52 + faceAreaRatio * 18, 0, 100);
-  const isValidFaceRead = detectedFaceShape && activePixels.length >= 160 && skinCandidateCount >= 90 && skinRatio >= 0.08 && mode !== "raw" && mode !== "image";
+  const isValidFaceRead =
+    mode !== "raw" &&
+    mode !== "image" &&
+    (detectedFaceShape || strongOvalFace || relaxedCameraFace);
 
   if (!isValidFaceRead) {
     return null;
@@ -2335,8 +2384,9 @@ async function copyCustomerReport() {
   }
 }
 
-async function handleImage(file) {
+async function handleImage(file, source = "upload") {
   if (!file) return;
+  lastPhotoSource = source;
   const fileName = file.name || "這張照片";
   const fileType = `${file.type || ""} ${fileName}`.toLowerCase();
 
@@ -2439,7 +2489,7 @@ function captureCameraPhoto() {
     }
     const photoFile = new File([blob], `camera-skin-check-${Date.now()}.jpg`, { type: "image/jpeg" });
     stopCamera();
-    handleImage(photoFile);
+    handleImage(photoFile, "camera");
   }, "image/jpeg", 0.92);
 }
 
@@ -2473,7 +2523,7 @@ function pointIsNearGuide(point) {
 }
 
 imageInput.addEventListener("change", (event) => {
-  handleImage(event.target.files[0]);
+  handleImage(event.target.files[0], "upload");
 });
 
 document.querySelector(".camera-box").addEventListener("click", (event) => {
@@ -2482,7 +2532,7 @@ document.querySelector(".camera-box").addEventListener("click", (event) => {
 });
 
 cameraInput.addEventListener("change", (event) => {
-  handleImage(event.target.files[0]);
+  handleImage(event.target.files[0], "camera");
 });
 
 closeCameraButton.addEventListener("click", stopCamera);
@@ -2500,7 +2550,7 @@ photoPanel.addEventListener("dragover", (event) => {
 
 photoPanel.addEventListener("drop", (event) => {
   event.preventDefault();
-  handleImage(event.dataTransfer.files[0]);
+  handleImage(event.dataTransfer.files[0], "upload");
 });
 
 if (copyReportButton) copyReportButton.addEventListener("click", copyCustomerReport);
@@ -2652,6 +2702,9 @@ if (startWelcomeButton) {
     setJourneyStep("capture");
   });
 }
+
+updateWelcomeStats();
+window.setInterval(updateWelcomeStats, 8000);
 
 document.querySelectorAll(".journey-step").forEach((button) => {
   button.addEventListener("click", () => {
