@@ -97,8 +97,8 @@ const journeyCopy = {
   },
   shop: {
     count: "Step 05 / 05",
-    title: "肌膚照護計畫",
-    hint: "依本次膚況建立照護步驟與產品順序。",
+    title: "建議購買",
+    hint: "依照出油、乾燥、泛紅或暗沉狀態，排序適合優先查看的產品。",
     progress: 100,
   },
 };
@@ -160,7 +160,7 @@ const scoreStatus = (score) => {
 const pct = (value) => `${Math.round(clamp(value))}%`;
 const displayScore = (score) => {
   const value = clamp(score, 1, 99);
-  return clamp(48 + Math.sqrt(value / 99) * 36 + value * 0.08, 50, 94);
+  return clamp(50 + Math.sqrt(value / 99) * 36 + value * 0.08, 52, 96);
 };
 
 function setJourneyStep(step, panel = null) {
@@ -299,8 +299,8 @@ function reset() {
   fields.colorVariance.textContent = "上傳照片後，這裡會觀察膚色均勻與透亮感。";
   fields.highlightRatio.textContent = "上傳照片後，這裡會整理泛紅、油光與妝前狀態。";
   fields.routineList.innerHTML = "<p>完成檢測後，這裡會提供適合妳的 FASCINÉ 梵希婗日間防禦與夜間修護流程。</p>";
-  fields.shopProfile.innerHTML = "<strong>等待肌膚檢測</strong><p>完成檢測後，這裡會顯示本次推薦主軸，讓每位客人的清單更有差異。</p>";
-  fields.shoppingList.innerHTML = "<p>完成檢測後，這裡會出現建議商品與購買連結。</p>";
+  fields.shopProfile.innerHTML = "<strong>等待肌膚檢測</strong><p>完成檢測後，這裡會整理本次適合先體驗的保養方向。</p>";
+  fields.shoppingList.innerHTML = "<p>完成檢測後，這裡會出現依膚況排序的產品建議。</p>";
   viewResultButton.disabled = true;
   viewResultButton.textContent = "下一步：膚況諮詢";
   activatePanel("summary");
@@ -445,10 +445,10 @@ function applyQuestionProfileToScores(scores) {
   };
   const habitAdjustments = {
     minimal: { hydration: -2, evenness: -1, shine: -1 },
-    basic: { hydration: 1 },
-    complete: { evenness: 2, redness: 1 },
-    antioxidant: { evenness: 2, hydration: 1 },
-    clinical: { redness: -1, evenness: 1 },
+    basic: { hydration: 2, redness: 1 },
+    complete: { hydration: 3, evenness: 4, redness: 3, shine: 1 },
+    antioxidant: { hydration: 3, evenness: 5, redness: 3, shine: 2 },
+    clinical: { hydration: 2, evenness: 3, redness: 1 },
   };
   const scenarioAdjustments = {
     makeup: { hydration: -1, shine: -1 },
@@ -459,9 +459,9 @@ function applyQuestionProfileToScores(scores) {
   };
   const paceAdjustments = {
     simple: { hydration: 1, redness: 1 },
-    daily: { evenness: 1 },
-    intensive: { hydration: -1, evenness: -1 },
-    completeCare: { hydration: -1, evenness: -1, redness: -1 },
+    daily: { hydration: 2, evenness: 2 },
+    intensive: { hydration: 3, evenness: 2, redness: 2 },
+    completeCare: { hydration: 4, evenness: 3, redness: 3, shine: 1 },
     flexible: { hydration: 1, redness: 1 },
   };
   const ageAdjustments = {
@@ -482,8 +482,67 @@ function applyQuestionProfileToScores(scores) {
 
   for (const adjustment of allAdjustments) {
     for (const [key, value] of Object.entries(adjustment)) {
-      adjusted[key] = clamp((adjusted[key] ?? scores[key]) + value, 50, 94);
+      adjusted[key] = clamp((adjusted[key] ?? scores[key]) + value, 52, 96);
     }
+  }
+
+  const advancedHabitLift = {
+    minimal: 0,
+    basic: 1,
+    complete: 2,
+    antioxidant: 3,
+    clinical: 2,
+  }[customerProfile.routineHabitValue] || 0;
+  const routineCommitmentLift = {
+    simple: 0,
+    daily: 1,
+    intensive: 2,
+    completeCare: 3,
+    flexible: 1,
+  }[customerProfile.routinePaceValue] || 0;
+  const careConsistencyLift = Math.min(5, advancedHabitLift + routineCommitmentLift);
+
+  if (careConsistencyLift) {
+    for (const key of Object.keys(adjusted)) {
+      adjusted[key] = clamp(adjusted[key] + careConsistencyLift, 52, 96);
+    }
+  }
+
+  return adjusted;
+}
+
+function calibrateConsumerScoreRange(scores, maintainedSkinLift = 0) {
+  const adjusted = { ...scores };
+  const values = Object.values(adjusted);
+  const average = values.reduce((sum, score) => sum + score, 0) / values.length;
+  const habitLift = {
+    minimal: -1,
+    basic: 2,
+    complete: 8,
+    antioxidant: 11,
+    clinical: 7,
+  }[customerProfile?.routineHabitValue] || 0;
+  const paceLift = {
+    simple: 0,
+    daily: 2,
+    intensive: 4,
+    completeCare: 6,
+    flexible: 1,
+  }[customerProfile?.routinePaceValue] || 0;
+  const stressLoad = [
+    ...(customerProfile?.concernValues || []),
+    ...(customerProfile?.lifeValues || []),
+    ...(customerProfile?.skinScenarioValues || []),
+  ].length;
+  const skinSignalLift = clamp((maintainedSkinLift - 1.8) * 1.5, -2, 4);
+  const targetAverage = clamp(64 + habitLift + paceLift + skinSignalLift - Math.min(4, stressLoad * 0.45), 60, 82);
+  const effectiveAverage = average < targetAverage
+    ? targetAverage
+    : clamp(average + Math.max(0, habitLift + paceLift) * 0.25, targetAverage, 88);
+
+  for (const key of Object.keys(adjusted)) {
+    const personalSpread = (adjusted[key] - average) * 0.9;
+    adjusted[key] = clamp(effectiveAverage + personalSpread, 56, 92);
   }
 
   return adjusted;
@@ -512,7 +571,7 @@ function separateTiedMetricScores(scores, concernSignals) {
     const offsets = offsetsByLength[ordered.length] || offsetsByLength[4];
 
     ordered.forEach((item, index) => {
-      nextScores[item.key] = clamp(nextScores[item.key] + offsets[index], 50, 94);
+      nextScores[item.key] = clamp(nextScores[item.key] + offsets[index], 52, 96);
     });
   }
 
@@ -533,7 +592,7 @@ function spreadCloseMetricScores(scores, concernSignals) {
 
   ordered.forEach((item, index) => {
     const naturalPull = clamp(((concernSignals[item.key] ?? 0) - 50) * -0.055, -2.1, 2.1);
-    nextScores[item.key] = clamp(center + offsets[index] + naturalPull, 50, 94);
+    nextScores[item.key] = clamp(center + offsets[index] + naturalPull, 52, 96);
   });
 
   return nextScores;
@@ -1187,11 +1246,20 @@ function analyzeSkin() {
     redness: clamp(2.6 - rednessRatio * 34 - Math.max(0, avg.redness - 34) * 0.07, -5, 4),
     shine: clamp(2.4 - tZoneHighlightRatio * 38 - highlightRatio * 16 + (avg.brightness < 122 ? 1.2 : 0), -5, 4),
   };
+  const maintainedSkinLift = clamp(
+    (15 - textureEnergy) * 0.16 +
+      (24 - variance) * 0.1 +
+      (0.065 - rednessRatio) * 18 +
+      (0.075 - tZoneHighlightRatio) * 12 +
+      (balancedLightBonus ? 0.8 : 0),
+    0,
+    5,
+  );
   const personalizedScores = applyQuestionProfileToScores({
-    hydration: displayScore(rawHydration - featureLift + balancedLightBonus) + imageSignature.hydration,
-    evenness: displayScore(rawEvenness - Math.max(0, sideBalance - 8) * 0.11 - darkSpotRatio * 54) + imageSignature.evenness,
-    redness: displayScore(rawRedness - rednessRatio * 46) + imageSignature.redness,
-    shine: displayScore(rawShine - tZoneHighlightRatio * 74 + (avg.brightness < 118 ? 1.5 : 0)) + imageSignature.shine,
+    hydration: displayScore(rawHydration - featureLift + balancedLightBonus) + imageSignature.hydration + maintainedSkinLift * 0.8,
+    evenness: displayScore(rawEvenness - Math.max(0, sideBalance - 8) * 0.11 - darkSpotRatio * 54) + imageSignature.evenness + maintainedSkinLift * 0.7,
+    redness: displayScore(rawRedness - rednessRatio * 46) + imageSignature.redness + maintainedSkinLift * 0.75,
+    shine: displayScore(rawShine - tZoneHighlightRatio * 74 + (avg.brightness < 118 ? 1.5 : 0)) + imageSignature.shine + maintainedSkinLift * 0.45,
   });
   const concernSignals = {
     hydration: 100 - rawHydration + textureEnergy * 0.5 + brightnessVariance * 0.22 + highlightRatio * 80,
@@ -1199,9 +1267,10 @@ function analyzeSkin() {
     redness: 100 - rawRedness + rednessRatio * 120 + rednessVariance * 0.3,
     shine: 100 - rawShine + tZoneHighlightRatio * 140 + highlightRatio * 90,
   };
-  const finalScores = spreadCloseMetricScores(separateTiedMetricScores(personalizedScores, concernSignals), concernSignals);
+  const calibratedScores = calibrateConsumerScoreRange(personalizedScores, maintainedSkinLift);
+  const finalScores = spreadCloseMetricScores(separateTiedMetricScores(calibratedScores, concernSignals), concernSignals);
   const { hydration, evenness, redness, shine } = finalScores;
-  const overall = clamp(hydration * 0.25 + evenness * 0.32 + redness * 0.22 + shine * 0.21, 50, 94);
+  const overall = clamp(hydration * 0.25 + evenness * 0.32 + redness * 0.22 + shine * 0.21, 52, 96);
   const confidence = clamp(
     96
       - modePenalty * 3
@@ -1243,12 +1312,12 @@ function labelFor(score, good, mid, low) {
 
 const fascineProducts = {
   cleanser: {
-    name: "雙效潔顏凝露",
+    name: "極淨水潤雙效潔顏凝露",
     role: "極致清潔",
     amount: "卸妝按壓 4-5 下；洗臉按壓 2-3 下",
     image: "assets/products/the-pure.jpg",
     routineImage: "assets/routine-products/the-pure.jpg",
-    shopImage: "assets/shop-products/the-pure.jpg",
+    shopImage: "assets/routine-products/the-pure.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11815253",
     match: "在清潔過程中形成細緻潔淨網，溫和洗淨皮脂、彩妝與髒污，還原柔嫩水光的膚觸。",
     keyBenefit: "清潔力與保濕平衡",
@@ -1259,7 +1328,7 @@ const fascineProducts = {
     amount: "每次按壓 6-10 下",
     image: "assets/products/the-lotion.jpg",
     routineImage: "assets/routine-products/the-lotion.jpg",
-    shopImage: "assets/shop-products/the-lotion.jpg",
+    shopImage: "assets/routine-products/the-lotion.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11814666",
     match: "多重補水與鎖水機制同步啟動，維持肌膚長效含水度，打造全天候飽滿澎潤的水感肌。",
     keyBenefit: "補水打底與水潤感",
@@ -1270,7 +1339,7 @@ const fascineProducts = {
     amount: "每次按壓 2-4 下",
     image: "assets/products/the-cream.jpg",
     routineImage: "assets/routine-products/the-cream.jpg",
-    shopImage: "assets/shop-products/the-cream.jpg",
+    shopImage: "assets/routine-products/the-cream.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11814606",
     match: "為肌膚注入盈潤滋養的頂級呵護，保持柔嫩與彈性，有感提升膚色明亮度、告別疲態。",
     keyBenefit: "鎖水修護與柔潤度",
@@ -1281,7 +1350,7 @@ const fascineProducts = {
     amount: "均勻且足量使用於全臉與頸部肌膚",
     image: "assets/products/sun-cream.jpg",
     routineImage: "assets/routine-products/sun-cream.jpg",
-    shopImage: "assets/shop-products/sun-cream.jpg",
+    shopImage: "assets/routine-products/sun-cream.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11814600",
     match: "具備 SPF50+ 最高防護力，於保養程序完成後均勻塗抹，為肌膚鋪開高效抗氧防護網。",
     keyBenefit: "防曬防護與妝前穩定",
@@ -1292,7 +1361,7 @@ const fascineProducts = {
     amount: "每次使用 6-8 滴",
     image: "assets/products/vital-c.jpg",
     routineImage: "assets/routine-products/vital-c.jpg",
-    shopImage: "assets/shop-products/vital-c.jpg",
+    shopImage: "assets/routine-products/vital-c.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11814690",
     match: "推薦於保養程序中適量加入，有感提升肌膚光澤度，迅速擺脫蠟黃暗沉。",
     keyBenefit: "透亮度與膚色均勻",
@@ -1303,7 +1372,7 @@ const fascineProducts = {
     amount: "每日 1 片，每次 10-15 分鐘",
     image: "assets/products/the-mask.jpg",
     routineImage: "assets/routine-products/the-mask.jpg",
-    shopImage: "assets/shop-products/the-mask.jpg",
+    shopImage: "assets/routine-products/the-mask.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11814850",
     match: "敷後接續日常保養，在最短時間內完成高效營養補充，提升肌膚透亮與細緻感。",
     keyBenefit: "週期提亮與細緻感",
@@ -1314,7 +1383,7 @@ const fascineProducts = {
     amount: "每次使用 1-2 顆",
     image: "assets/products/the-serum-30.jpg",
     routineImage: "assets/routine-products/the-serum-30.jpg",
-    shopImage: "assets/shop-products/the-serum-30.jpg",
+    shopImage: "assets/routine-products/the-serum-30.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11815187",
     match: "為肌膚注入高營養修護能量，柔化粗糙與微細紋路，重現水潤緊緻的絲滑膚觸。",
     keyBenefit: "滋養度與乾燥紋理",
@@ -1323,10 +1392,10 @@ const fascineProducts = {
     name: "亮膚奇肌露",
     role: "前導緊緻",
     amount: "均勻噴灑於全臉與頸部肌膚",
-    image: "assets/products/the-lotion.jpg",
-    routineImage: "assets/routine-products/the-lotion.jpg",
-    shopImage: "assets/shop-products/the-lotion.jpg",
-    href: "https://www.fascine.tw/",
+    image: "assets/products/bright-primer-product.jpg",
+    routineImage: "assets/products/bright-primer-product.jpg",
+    shopImage: "assets/products/bright-primer-product.jpg",
+    href: "https://www.fascine.tw/SalePage/Index/11815200",
     match: "全方位潤澤並緊緻肌膚，賦予彈力與透亮光澤，瞬間開啟後續保養的吸收通道。",
     keyBenefit: "前導吸收與舒緩穩定",
   },
@@ -1334,10 +1403,10 @@ const fascineProducts = {
     name: "平衡水光露",
     role: "精準調理",
     amount: "每次使用 4-5 滴",
-    image: "assets/products/the-serum-30.jpg",
-    routineImage: "assets/routine-products/the-serum-30.jpg",
-    shopImage: "assets/shop-products/the-serum-30.jpg",
-    href: "https://www.fascine.tw/",
+    image: "assets/products/balance-dew-product.jpg",
+    routineImage: "assets/routine-products/balance-dew-product.jpg",
+    shopImage: "assets/routine-products/balance-dew-product.jpg",
+    href: "https://www.fascine.tw/SalePage/Index/11814639",
     match: "溫和更新角質、調理油水平衡，舒緩肌膚不適，使膚況更加穩定，同時勻亮膚色。",
     keyBenefit: "油水平衡與膚色調理",
   },
@@ -1347,7 +1416,7 @@ const fascineProducts = {
     amount: "均勻使用於全臉與頸部肌膚",
     image: "assets/products/the-cream.jpg",
     routineImage: "assets/routine-products/the-cream.jpg",
-    shopImage: "assets/shop-products/the-cream.jpg",
+    shopImage: "assets/routine-products/the-cream.jpg",
     href: "https://www.fascine.tw/",
     match: "幫助肌膚降低修護壓力，適合需要密集修護、穩定屏障與提升細緻度時加入。",
     keyBenefit: "密集修護與屏障支持",
@@ -1358,7 +1427,7 @@ const fascineProducts = {
     amount: "每日 1 片，每次 10-15 分鐘",
     image: "assets/products/the-mask.jpg",
     routineImage: "assets/routine-products/the-mask.jpg",
-    shopImage: "assets/shop-products/the-mask.jpg",
+    shopImage: "assets/routine-products/the-mask.jpg",
     href: "https://www.fascine.tw/",
     match: "快速補充水分與營養，適合乾燥、緊繃或需要短期密集修護的膚況。",
     keyBenefit: "高效補水與修護",
@@ -1369,7 +1438,7 @@ const fascineProducts = {
     amount: "兩眼周各 3 顆綠豆大小",
     image: "assets/products/vital-c.jpg",
     routineImage: "assets/routine-products/vital-c.jpg",
-    shopImage: "assets/shop-products/vital-c.jpg",
+    shopImage: "assets/routine-products/vital-c.jpg",
     href: "https://www.fascine.tw/",
     match: "針對眼周疲態與細紋感加強抗氧照護，讓整體膚況看起來更有精神。",
     keyBenefit: "眼周抗氧與細緻感",
@@ -1377,10 +1446,10 @@ const fascineProducts = {
 };
 
 const productPriorityByMetric = {
-  hydration: ["lotion", "cream", "serum22", "hydraMask"],
-  evenness: ["sun", "vitalC", "mask", "primer"],
+  hydration: ["lotion", "serum22", "cream", "primer", "hydraMask"],
+  evenness: ["sun", "vitalC", "primer", "mask"],
   redness: ["primer", "lotion", "cream", "exocell"],
-  shine: ["balanceDew", "sun", "lotion", "cleanser"],
+  shine: ["primer", "balanceDew", "sun", "cleanser", "lotion"],
 };
 
 const metricTags = {
@@ -1396,21 +1465,25 @@ const metricProfiles = {
     title: "補水修護型",
     english: "Hydration & Repair | Intensive Care",
     focus: "核心對策：以深度補水、長效鎖水與夜間密集修護為主軸，賦予肌膚飽滿澎潤的視覺質感。",
+    reason: "本次水潤感較需要照顧，代表肌膚可能容易乾燥、緊繃或妝前不夠服貼，建議優先從補水與鎖水產品開始。",
   },
   evenness: {
     title: "透亮防護型",
     english: "Radiance & Defense | Priority Care",
     focus: "核心對策：以日間抗氧防護與夜間精準提亮為主軸，全方位勻亮膚色、重現澄淨光澤。",
+    reason: "本次透亮與均勻度是主要觀察重點，代表肌膚可能容易暗沉、蠟黃或膚色不均，建議優先搭配防護與提亮產品。",
   },
   redness: {
     title: "舒緩穩定型",
     english: "Soothing & Stability | Priority Care",
     focus: "核心對策：以簡化保養程序與穩定肌膚屏障為首要目標，先回歸純淨健康，再開啟功能型保養。",
+    reason: "本次舒緩穩定度較需要照顧，代表肌膚可能容易泛紅、敏弱或換季不穩，建議先選擇保濕修護與屏障照護產品。",
   },
   shine: {
     title: "清爽控光型",
     english: "Matte & Balance | Maintenance",
     focus: "核心對策：以清爽補水與日間控油防護為主，精準調控妝前油光，讓妝感細緻、不浮粉脫妝。",
+    reason: "本次油光與皮脂平衡是主要觀察重點，代表肌膚可能容易出油、毛孔粗糙或 T 字泛光，建議優先從調理油水平衡與清爽防護產品開始。",
   },
 };
 
@@ -1436,6 +1509,7 @@ function getShopProfile(result) {
     title: `${profile.title}｜${intensity}`,
     english: profile.english,
     focus: `${profile.focus} 本次第二重點是${secondaryText}${customerProfile?.concernLabel ? `，並納入妳在意的「${customerProfile.concernLabel}」${lifeText}。` : "，照護步驟會依這兩個方向分層建議。"}`,
+    reason: profile.reason,
     primary,
     secondary,
   };
@@ -1624,7 +1698,7 @@ function getRecommendedProducts(result) {
       reason: "水潤感不足或紋理較明顯時，放在晚間修護步驟。",
     },
     primer: {
-      score: 20 + deficit.redness * 0.52 + deficit.evenness * 0.42 + deficit.hydration * 0.22,
+      score: 34 + deficit.redness * 0.58 + deficit.evenness * 0.5 + deficit.hydration * 0.32,
       reason: "作為前導步驟，幫助後續保養銜接，適合泛紅、乾燥或膚色疲態時加入。",
     },
     balanceDew: {
@@ -1648,6 +1722,7 @@ function getRecommendedProducts(result) {
   if (hasConcern("hydration")) {
     productScores.lotion.score += 24;
     productScores.cream.score += 18;
+    productScores.primer.score += 12;
     productScores.serum22.score += 12;
     productScores.hydraMask.score += 18;
   }
@@ -1667,6 +1742,7 @@ function getRecommendedProducts(result) {
   }
   if (hasConcern("shine")) {
     productScores.cleanser.score += 20;
+    productScores.primer.score += 8;
     productScores.sun.score += 14;
     productScores.lotion.score += 8;
     productScores.balanceDew.score += 24;
@@ -1684,6 +1760,7 @@ function getRecommendedProducts(result) {
     productScores.eyeCream.score += 16;
   }
   if (hasLifeFactor("sleep") || hasLifeFactor("stress") || hasLifeFactor("selfcare")) {
+    productScores.primer.score += 14;
     productScores.lotion.score += 12;
     productScores.cream.score += 10;
     productScores.vitalC.score += 8;
@@ -1716,6 +1793,7 @@ function getRecommendedProducts(result) {
     productScores.vitalC.score -= 6;
   }
   if (hasScenario("makeup")) {
+    productScores.primer.score += 12;
     productScores.lotion.score += 12;
     productScores.sun.score += 12;
     productScores.cleanser.score += 6;
@@ -1813,7 +1891,7 @@ function getRecommendedProducts(result) {
   if (hasConcern("hydration")) addAnswerProducts("lotion", "cream", "serum22", "hydraMask");
   if (hasConcern("evenness")) addAnswerProducts("sun", "vitalC", "mask", "primer");
   if (hasConcern("redness")) addAnswerProducts("primer", "lotion", "cream", "exocell");
-  if (hasConcern("shine")) addAnswerProducts("cleanser", "balanceDew", "sun", "lotion");
+  if (hasConcern("shine")) addAnswerProducts("primer", "balanceDew", "sun", "cleanser", "lotion");
   if (hasConcern("texture")) addAnswerProducts("serum22", "cream", "lotion", "exocell");
   if (hasConcern("fineLines")) addAnswerProducts("serum22", "cream", "vitalC", "eyeCream");
 
@@ -1851,6 +1929,15 @@ function getRecommendedProducts(result) {
     if (picked.size < targetCount && !picked.has(product.name)) picked.set(product.name, product);
   });
 
+  const primerProduct = sorted.find((product) => product.name === fascineProducts.primer.name);
+  if (primerProduct && !picked.has(primerProduct.name)) {
+    if (picked.size >= targetCount) {
+      const replaceable = Array.from(picked.values()).reverse().find((product) => product.name !== fascineProducts.lotion.name);
+      if (replaceable) picked.delete(replaceable.name);
+    }
+    if (picked.size < targetCount) picked.set(primerProduct.name, primerProduct);
+  }
+
   if (["intensive", "completeCare"].includes(customerProfile?.routinePaceValue)) {
     ["vitalC", "mask", "serum22", "exocell", "eyeCream"].forEach((key) => {
       const product = sorted.find((item) => item.name === fascineProducts[key].name);
@@ -1869,9 +1956,11 @@ function renderProductCard(product, compact = false) {
     ? "第一步"
     : product.rankLabel === "搭配加強"
       ? "第二步"
-      : "延伸照護";
+      : product.rankLabel === "基礎必備"
+        ? "基礎保養"
+        : "延伸照護";
   return `
-    <article class="product-card${compact ? " compact" : ""}">
+    <article class="product-card product-${product.productKey || "item"}${compact ? " compact" : ""}">
       <div class="product-image">
         <img src="${product.shopImage || product.image}" alt="${product.name}" loading="lazy" />
         <span>${product.tag}</span>
@@ -1880,7 +1969,7 @@ function renderProductCard(product, compact = false) {
         <small>${stepLabel} · ${product.rankLabel || product.role}</small>
         <strong>${product.name}</strong>
         <p>${product.amount}</p>
-        ${compact ? "" : `<em><b>建議原因</b>${product.match}</em>`}
+        ${compact ? "" : `<em><b>推薦購買原因</b>${product.match}</em>`}
         <a href="${product.href}" rel="noopener">查看產品</a>
       </div>
     </article>
@@ -1888,13 +1977,55 @@ function renderProductCard(product, compact = false) {
 }
 
 function renderProductRecommendations(products, profile) {
+  const cleanserProduct = products.find((product) => product.productKey === "cleanser") || {
+    ...fascineProducts.cleanser,
+    productKey: "cleanser",
+    tag: metricTags.daily,
+    rankLabel: "基礎必備",
+    match: "不論偏乾、出油、泛紅或暗沉，清潔都是保養吸收與後續穩定度的第一步。先把皮脂、髒污與防曬殘留洗乾淨，後續保濕與修護才更好銜接。",
+  };
+  const skinProducts = products.filter((product) => product.productKey !== "cleanser");
+  const priorityProducts = skinProducts.slice(0, 3);
+  const optionalProducts = skinProducts.slice(3);
+  const priorityNames = priorityProducts.map((product) => product.name).join("、");
   fields.shopProfile.innerHTML = `
-    <span>推薦主軸</span>
+    <span>建議購買主軸</span>
     <strong>${profile.title}</strong>
     <em>${profile.english}</em>
-    <p>${profile.focus} 這份清單不是一次全部都要買，而是依照本次膚況需求與保養程序順序，分層安排最適合妳的照護計畫。</p>
+    <p>${profile.reason} ${profile.focus}</p>
+    <p class="shop-priority-reason">本次建議先看：${priorityNames}。這 3 個品項會依照當前膚況與問答結果排序，先處理最明顯的保養需求，再依照肌膚反應慢慢補齊照護節奏。</p>
   `;
-  fields.shoppingList.innerHTML = products.map((product) => renderProductCard(product)).join("");
+  fields.shoppingList.innerHTML = `
+    <div class="product-section product-section-basic">
+      <div class="product-section-title">
+        <span>Base Care</span>
+        <strong>基礎必備</strong>
+      </div>
+      <div class="product-grid-inner product-grid-basic">
+        ${renderProductCard({ ...cleanserProduct, rankLabel: "基礎必備" })}
+      </div>
+    </div>
+    <div class="product-section">
+      <div class="product-section-title">
+        <span>Priority 01</span>
+        <strong>本次優先建議</strong>
+      </div>
+      <div class="product-grid-inner">
+        ${priorityProducts.map((product) => renderProductCard(product)).join("")}
+      </div>
+    </div>
+    ${optionalProducts.length ? `
+      <div class="product-section product-section-optional">
+        <div class="product-section-title">
+          <span>Optional Care</span>
+          <strong>想加強再查看</strong>
+        </div>
+        <div class="product-grid-inner">
+          ${optionalProducts.map((product) => renderProductCard(product)).join("")}
+        </div>
+      </div>
+    ` : ""}
+  `;
 }
 
 const routineBlueprint = {
@@ -2666,8 +2797,8 @@ document.querySelectorAll("[data-go-panel]").forEach((button) => {
         mode: "routine",
       },
       shop: {
-        title: "正在整理肌膚照護計畫",
-        steps: ["比對本次較需要照顧的項目", "依照護程序排序產品", "生成專屬購買建議清單"],
+        title: "正在整理建議購買清單",
+        steps: ["比對本次較需要照顧的項目", "判斷出油、乾燥與穩定狀態", "整理 FASCINÉ 產品優先順序"],
         duration: 3200,
         mode: "shop",
       },
