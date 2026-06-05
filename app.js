@@ -198,19 +198,31 @@ function updateWelcomeStats() {
   if (!welcomeStats.today || !welcomeStats.monthly || !welcomeStats.stability) return;
 
   const now = new Date();
-  const daySeed = Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`);
-  const monthSeed = Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const daySeed = Number(`${year}${month}${day}`);
+  const monthSeed = Number(`${year}${month}`);
   const dateIndex = now.getDate();
-  const dailyStep = 8 + (seededNumber(monthSeed + 17) % 8);
-  const today = 14 + (seededNumber(daySeed) % 9) + (dateIndex - 1) * dailyStep;
-  const monthBase = 108 + (seededNumber(monthSeed) % 18);
-  const monthGrowth = (dateIndex - 1) * dailyStep + Math.floor((dateIndex - 1) * (dateIndex - 2) * 0.55);
-  const monthly = monthBase + monthGrowth;
+  const dailyCountFor = (dayIndex, includeTodayProgress = false) => {
+    const loopDay = String(dayIndex).padStart(2, "0");
+    const loopSeed = Number(`${year}${month}${loopDay}`);
+    const slowLift = Math.min(8, Math.floor((dayIndex - 1) * 0.36));
+    const dayVariation = seededNumber(loopSeed + 21) % 7;
+    const hourLift = includeTodayProgress ? Math.floor(now.getHours() / 5) : 4;
+    return clamp(9 + slowLift + dayVariation + hourLift, 10, 29);
+  };
+  const today = dailyCountFor(dateIndex, true);
+  const monthBase = 82 + (seededNumber(monthSeed) % 18);
+  let monthly = monthBase;
+  for (let dayIndex = 1; dayIndex <= dateIndex; dayIndex += 1) {
+    monthly += dailyCountFor(dayIndex, dayIndex === dateIndex);
+  }
   const stability = 93 + (seededNumber(daySeed + 93) % 4);
 
   welcomeStats.today.textContent = formatNumber(today);
   welcomeStats.monthly.textContent = formatNumber(monthly);
-  welcomeStats.stability.textContent = formatNumber(clamp(stability, 86, 96));
+  welcomeStats.stability.textContent = formatNumber(clamp(stability, 93, 96));
 }
 
 function sleep(ms) {
