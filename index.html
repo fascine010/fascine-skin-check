@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FASCINÉ 肌膚檢測</title>
-    <link rel="stylesheet" href="styles.css?v=20260605-1504" />
+    <link rel="stylesheet" href="styles.css?v=20260608-1310" />
   </head>
   <body>
     <main class="app-shell">
@@ -87,7 +87,7 @@
             <small class="upload-status" id="uploadStatus">照片僅供本次檢測使用，不會公開或儲存於雲端資料庫，敬請安心。</small>
 
             <div class="meter-card primary">
-              <span>本次肌膚參考分數</span>
+              <span>AI Skin Score 肌膚狀態分數</span>
               <strong id="overallScore">--</strong>
               <div class="score-bar">
                 <span id="overallBar"></span>
@@ -123,22 +123,22 @@
 
             <div class="metrics-grid">
               <article class="metric-card">
-                <span>水潤感</span>
+                <span>水潤狀態</span>
                 <strong id="hydrationScore">--</strong>
                 <small id="hydrationNote">等待照片</small>
               </article>
               <article class="metric-card">
-                <span>均勻度</span>
+                <span>透亮狀態</span>
                 <strong id="evennessScore">--</strong>
                 <small id="evennessNote">等待照片</small>
               </article>
               <article class="metric-card">
-                <span>泛紅</span>
+                <span>穩定狀態</span>
                 <strong id="rednessScore">--</strong>
                 <small id="rednessNote">等待照片</small>
               </article>
               <article class="metric-card">
-                <span>油光</span>
+                <span>平衡狀態</span>
                 <strong id="shineScore">--</strong>
                 <small id="shineNote">等待照片</small>
               </article>
@@ -348,19 +348,19 @@
             </div>
             <div class="signal-grid">
               <div class="signal-row">
-                <span>肌膚保濕度</span>
+                <span>水潤狀態</span>
                 <b id="hydrationSignal"></b>
               </div>
               <div class="signal-row">
-                <span>透亮與光澤度</span>
+                <span>透亮狀態</span>
                 <b id="evennessSignal"></b>
               </div>
               <div class="signal-row">
-                <span>肌膚防禦力／敏弱度</span>
+                <span>穩定狀態</span>
                 <b id="rednessSignal"></b>
               </div>
               <div class="signal-row">
-                <span>皮脂平衡狀態</span>
+                <span>平衡狀態</span>
                 <b id="shineSignal"></b>
               </div>
               <div class="scan-info-card">
@@ -383,14 +383,14 @@
             <p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>
           </div>
           <div class="growth-system" id="growthSystem">
-            <span>肌膚成長系統</span>
-            <strong>等待建立肌膚等級</strong>
-            <p>完成檢測後，會顯示肌膚成長值與建議回測天數。</p>
+            <span>Skin Score Journey</span>
+            <strong>等待建立肌膚分數等級</strong>
+            <p>完成檢測後，會顯示目前分數、下一等級距離與建議補強節奏。僅記錄上次分數作為本機參考，不儲存照片。</p>
           </div>
           <div class="age-benchmark" id="ageBenchmark">
-            <span>同齡膚況參考</span>
+            <span>同齡分數參考</span>
             <strong>等待年齡資料</strong>
-            <p>完成膚況問答後，這裡會顯示同年齡層建議維持的參考分數。</p>
+            <p>完成膚況問答後，這裡會顯示同年齡層建議維持的分數區間。</p>
           </div>
           <div class="summary-list" id="summaryList">
             <p>完成檢測後，這裡會顯示你的主要肌膚觀察與保養方向。</p>
@@ -450,19 +450,19 @@
           </div>
           <div class="result-actions">
             <button class="secondary-action" type="button" data-go-panel="summary">返回檢測結果</button>
-            <button class="primary-action" type="button" data-go-panel="shop">查看建議購買</button>
+            <button class="primary-action" type="button" data-go-panel="shop">查看專屬改善方案</button>
           </div>
         </section>
 
-        <section class="panel" id="shop" aria-label="建議購買">
+        <section class="panel" id="shop" aria-label="專屬改善方案">
           <div class="panel-title">
             <p class="eyebrow">Step 05 / Shop Recommendation</p>
-            <h2>建議購買</h2>
+            <h2>專屬改善方案</h2>
           </div>
           <div class="shop-panel-head">
             <div>
-              <strong>根據本次 AI 膚況檢測，為您整理適合優先購買的 FASCINÉ 產品方向。</strong>
-              <p>如果目前容易出油、乾燥、泛紅或暗沉，系統會依照分數與問答，排序最貼近需求的產品。</p>
+              <strong>根據本次 AI Skin Score，整理最適合優先提升的 FASCINÉ 照護方向。</strong>
+              <p>如果目前容易出油、乾燥、泛紅或暗沉，系統會依照較需要照顧的狀態與問答，排序最貼近需求的產品。</p>
             </div>
           </div>
           <div class="shop-profile" id="shopProfile">
@@ -503,6 +503,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260605-1504"></script>
+    <script src="app.js?v=20260608-1310"></script>
   </body>
 </html>

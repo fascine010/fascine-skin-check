@@ -7,6 +7,7 @@ const welcomeStats = {
   monthly: document.querySelector("#monthlyImproveCount"),
   stability: document.querySelector("#stabilityLiftRate"),
 };
+const SKIN_ENERGY_HISTORY_KEY = "fascineSkinEnergyHistory";
 const imageInput = document.querySelector("#imageInput");
 const cameraInput = document.querySelector("#cameraInput");
 const uploadActions = document.querySelector(".upload-actions");
@@ -97,8 +98,8 @@ const journeyCopy = {
   },
   shop: {
     count: "Step 05 / 05",
-    title: "建議購買",
-    hint: "依照出油、乾燥、泛紅或暗沉狀態，排序適合優先查看的產品。",
+    title: "專屬改善方案",
+    hint: "依照水潤、透亮、穩定與平衡中較需要照顧的狀態，排序適合優先查看的產品。",
     progress: 100,
   },
 };
@@ -204,21 +205,22 @@ function updateWelcomeStats() {
   const daySeed = Number(`${year}${month}${day}`);
   const monthSeed = Number(`${year}${month}`);
   const dateIndex = now.getDate();
+  const dayOfYear = Math.floor((now - new Date(year, 0, 0)) / 86400000);
   const dailyCountFor = (dayIndex, includeTodayProgress = false) => {
     const loopDay = String(dayIndex).padStart(2, "0");
     const loopSeed = Number(`${year}${month}${loopDay}`);
-    const slowLift = Math.min(8, Math.floor((dayIndex - 1) * 0.36));
-    const dayVariation = seededNumber(loopSeed + 21) % 7;
-    const hourLift = includeTodayProgress ? Math.floor(now.getHours() / 5) : 4;
-    return clamp(9 + slowLift + dayVariation + hourLift, 10, 29);
+    const monthlyLift = Math.min(9, Math.floor((dayIndex - 1) * 0.5));
+    const dayVariation = seededNumber(loopSeed + 37) % 6;
+    const hourLift = includeTodayProgress ? Math.min(6, Math.floor(now.getHours() / 4)) : 6;
+    return clamp(10 + monthlyLift + dayVariation + hourLift, 10, 29);
   };
   const today = dailyCountFor(dateIndex, true);
-  const monthBase = 82 + (seededNumber(monthSeed) % 18);
+  const monthBase = 88 + (seededNumber(monthSeed + 11) % 12);
   let monthly = monthBase;
   for (let dayIndex = 1; dayIndex <= dateIndex; dayIndex += 1) {
     monthly += dailyCountFor(dayIndex, dayIndex === dateIndex);
   }
-  const stability = 93 + (seededNumber(daySeed + 93) % 4);
+  const stability = 93 + (seededNumber(daySeed + dayOfYear) % 4);
 
   welcomeStats.today.textContent = formatNumber(today);
   welcomeStats.monthly.textContent = formatNumber(monthly);
@@ -302,8 +304,8 @@ function reset() {
   renderAlignedFaceMesh(null);
   fields.skinFingerprint.innerHTML = "<span>AI 臉部膚況辨識</span><strong>等待檢測</strong><p>完成檢測後，會整理你目前偏向的肌膚狀態與保養主軸。</p>";
   fields.coachLetter.innerHTML = "<span>AI 顧問給妳的一封信</span><p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>";
-  fields.growthSystem.innerHTML = "<span>肌膚成長系統</span><strong>等待建立肌膚等級</strong><p>完成檢測後，會顯示肌膚成長值與建議回測天數。</p>";
-  fields.ageBenchmark.innerHTML = "<span>同齡膚況參考</span><strong>等待年齡資料</strong><p>完成膚況問答後，這裡會顯示同年齡層建議維持的參考分數。</p>";
+  fields.growthSystem.innerHTML = "<span>Skin Score Journey</span><strong>等待建立肌膚分數等級</strong><p>完成檢測後，會顯示目前分數、下一等級距離與建議補強節奏。僅記錄上次分數作為本機參考，不儲存照片。</p>";
+  fields.ageBenchmark.innerHTML = "<span>同齡分數參考</span><strong>等待年齡資料</strong><p>完成膚況問答後，這裡會顯示同年齡層建議維持的分數區間。</p>";
   fields.summaryList.innerHTML = "<p>完成檢測後，這裡會顯示你的主要肌膚觀察與保養方向。</p>";
   fields.sampleMode.textContent = "上傳照片後，這裡會觀察肌膚的水潤與細緻感。";
   fields.facePosition.textContent = "上傳照片後，這裡會說明這次主要讀取的臉部區域。";
@@ -311,7 +313,7 @@ function reset() {
   fields.colorVariance.textContent = "上傳照片後，這裡會觀察膚色均勻與透亮感。";
   fields.highlightRatio.textContent = "上傳照片後，這裡會整理泛紅、油光與妝前狀態。";
   fields.routineList.innerHTML = "<p>完成檢測後，這裡會提供適合妳的 FASCINÉ 梵希婗日間防禦與夜間修護流程。</p>";
-  fields.shopProfile.innerHTML = "<strong>等待肌膚檢測</strong><p>完成檢測後，這裡會整理本次適合先體驗的保養方向。</p>";
+  fields.shopProfile.innerHTML = "<strong>等待肌膚分數檢測</strong><p>完成檢測後，這裡會整理本次適合優先補強的改善建議。</p>";
   fields.shoppingList.innerHTML = "<p>完成檢測後，這裡會出現依膚況排序的產品建議。</p>";
   viewResultButton.disabled = true;
   viewResultButton.textContent = "下一步：膚況諮詢";
@@ -1061,6 +1063,60 @@ function renderPreviewOnly() {
   emptyState.hidden = true;
 }
 
+function createZoneAccumulator() {
+  return {
+    count: 0,
+    brightness: 0,
+    texture: 0,
+    localTexture: 0,
+    redness: 0,
+    highlight: 0,
+    dark: 0,
+  };
+}
+
+function faceZoneForSample(sample) {
+  const ax = Math.abs(sample.nx);
+  if (ax < 0.58 && sample.ny > 0.38) return "lower";
+  if (ax < 0.26 && sample.ny > -0.62 && sample.ny <= 0.38) return "tZone";
+  if (ax > 0.22 && ax < 0.82 && sample.ny > -0.22 && sample.ny < 0.52) return "cheeks";
+  if (ax < 0.58 && sample.ny <= -0.42) return "forehead";
+  return null;
+}
+
+function addZoneSample(zone, sample, avg) {
+  zone.count += 1;
+  zone.brightness += sample.brightness;
+  zone.texture += Math.abs(sample.brightness - avg.brightness);
+  zone.localTexture += sample.localContrast || 0;
+  zone.redness += sample.redness;
+  if (sample.brightness > avg.brightness + 22 && sample.brightness > 128) zone.highlight += 1;
+  if (sample.brightness < avg.brightness - 24) zone.dark += 1;
+}
+
+function finalizeZone(zone) {
+  if (!zone.count) {
+    return {
+      count: 0,
+      brightness: 0,
+      texture: 0,
+      localTexture: 0,
+      redness: 0,
+      highlightRatio: 0,
+      darkRatio: 0,
+    };
+  }
+  return {
+    count: zone.count,
+    brightness: zone.brightness / zone.count,
+    texture: zone.texture / zone.count,
+    localTexture: zone.localTexture / zone.count,
+    redness: zone.redness / zone.count,
+    highlightRatio: zone.highlight / zone.count,
+    darkRatio: zone.dark / zone.count,
+  };
+}
+
 function analyzeSkin() {
   const detectedSkinBox = getSkinDetectionBox();
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -1207,6 +1263,12 @@ function analyzeSkin() {
   let rightCount = 0;
   let tZoneHighlightCount = 0;
   let tZoneCount = 0;
+  const zoneAccumulators = {
+    forehead: createZoneAccumulator(),
+    tZone: createZoneAccumulator(),
+    cheeks: createZoneAccumulator(),
+    lower: createZoneAccumulator(),
+  };
 
   for (const p of activePixels) {
     const colorDistance = Math.hypot(p.r - avg.r, p.g - avg.g, p.b - avg.b);
@@ -1230,6 +1292,8 @@ function analyzeSkin() {
       tZoneCount += 1;
       if (p.brightness > avg.brightness + 18 && p.brightness > 132) tZoneHighlightCount += 1;
     }
+    const zoneKey = faceZoneForSample(p);
+    if (zoneKey) addZoneSample(zoneAccumulators[zoneKey], p, avg);
   }
 
   variance /= activePixels.length;
@@ -1243,13 +1307,27 @@ function analyzeSkin() {
   const darkSpotRatio = darkSpotCount / activePixels.length;
   const tZoneHighlightRatio = tZoneCount ? tZoneHighlightCount / tZoneCount : highlightRatio;
   const sideBalance = leftCount && rightCount ? Math.abs(leftBrightness / leftCount - rightBrightness / rightCount) : 0;
+  const zones = Object.fromEntries(
+    Object.entries(zoneAccumulators).map(([key, zone]) => [key, finalizeZone(zone)]),
+  );
+  const cheekTextureSignal = clamp((zones.cheeks.texture - textureEnergy) * 0.72 + (zones.lower.texture - textureEnergy) * 0.34, -4, 9);
+  const tZoneOilSignal = clamp(tZoneHighlightRatio * 120 + zones.tZone.highlightRatio * 155 + Math.max(0, zones.tZone.brightness - avg.brightness - 8) * 0.22, 0, 18);
+  const cheekRednessSignal = clamp((Math.max(0, zones.cheeks.redness - avg.redness) * 0.16) + zones.cheeks.highlightRatio * 26, 0, 10);
+  const toneZoneSignal = clamp(
+    Math.abs(zones.cheeks.brightness - zones.forehead.brightness) * 0.18 +
+      Math.abs(zones.cheeks.brightness - zones.lower.brightness) * 0.14 +
+      zones.forehead.darkRatio * 46 +
+      zones.lower.darkRatio * 38,
+    0,
+    16,
+  );
 
   const modePenalty = { skin: 0, fallback: 5, raw: 9, image: 12 }[mode];
   const lightPenalty = Math.abs(avg.brightness - 152) * 0.12;
-  const rawHydration = clamp(94 - textureEnergy * 0.58 - brightnessVariance * 0.32 - localTexture * 0.42 - highlightRatio * 155 - lightPenalty - modePenalty * 0.8, 1, 99);
-  const rawEvenness = clamp(100 - variance * 0.95 - darkSpotRatio * 360 - sideBalance * 1.25 - avg.saturation * 16 - modePenalty * 0.8, 1, 99);
-  const rawRedness = clamp(99 - rednessRatio * 180 - Math.max(0, avg.redness - 42) * 0.35 - rednessVariance * 0.22 - modePenalty * 0.8, 1, 99);
-  const rawShine = clamp(98 - highlightRatio * 250 - tZoneHighlightRatio * 300 - Math.max(0, avg.brightness - 176) * 0.38 - modePenalty * 0.8, 1, 99);
+  const rawHydration = clamp(94 - textureEnergy * 0.58 - brightnessVariance * 0.32 - localTexture * 0.42 - highlightRatio * 155 - cheekTextureSignal * 1.15 - lightPenalty - modePenalty * 0.8, 1, 99);
+  const rawEvenness = clamp(100 - variance * 0.95 - darkSpotRatio * 360 - sideBalance * 1.25 - toneZoneSignal * 0.78 - avg.saturation * 16 - modePenalty * 0.8, 1, 99);
+  const rawRedness = clamp(99 - rednessRatio * 180 - cheekRednessSignal * 1.8 - Math.max(0, avg.redness - 42) * 0.35 - rednessVariance * 0.22 - modePenalty * 0.8, 1, 99);
+  const rawShine = clamp(98 - highlightRatio * 250 - tZoneHighlightRatio * 300 - tZoneOilSignal * 0.92 - Math.max(0, avg.brightness - 176) * 0.38 - modePenalty * 0.8, 1, 99);
   const featureLift = clamp((brightnessVariance - 18) * 0.1 + (variance - 24) * 0.07 + (textureEnergy - 13) * 0.1, -3, 4);
   const balancedLightBonus = avg.brightness > 108 && avg.brightness < 188 ? 1.2 : 0;
   const imageSignature = {
@@ -1310,6 +1388,13 @@ function analyzeSkin() {
     localTexture,
     brightnessVariance,
     sideBalance,
+    zones,
+    zoneSignals: {
+      cheekTexture: cheekTextureSignal,
+      tZoneOil: tZoneOilSignal,
+      cheekRedness: cheekRednessSignal,
+      tone: toneZoneSignal,
+    },
     mode,
     avgBrightness: avg.brightness,
     confidence,
@@ -1397,7 +1482,7 @@ const fascineProducts = {
     routineImage: "assets/routine-products/the-serum-30.jpg",
     shopImage: "assets/routine-products/the-serum-30.jpg",
     href: "https://www.fascine.tw/SalePage/Index/11815187",
-    match: "為肌膚注入高營養修護能量，柔化粗糙與微細紋路，重現水潤緊緻的絲滑膚觸。",
+    match: "為肌膚注入高營養修護養分，柔化粗糙與微細紋路，重現水潤緊緻的絲滑膚觸。",
     keyBenefit: "滋養度與乾燥紋理",
   },
   primer: {
@@ -1499,6 +1584,49 @@ const metricProfiles = {
   },
 };
 
+const guideSkinProfiles = {
+  dry: {
+    label: "乾性肌照護",
+    title: "乾性肌｜補水修護型",
+    english: "Dry Skin | Hydration Repair",
+    focus: "依官網保養指南方向，先以補水、鎖水與夜間修護為主，讓乾燥緊繃感先穩定下來。",
+    reason: "本次判斷偏向乾燥缺水型，建議優先把前導、保濕與鎖水產品安排完整。",
+    products: ["cleanser", "primer", "lotion", "cream", "serum22", "hydraMask"],
+  },
+  oilyAcne: {
+    label: "油痘肌照護",
+    title: "油痘肌｜清爽平衡型",
+    english: "Oily Skin | Sebum Balance",
+    focus: "依官網保養指南方向，先以溫和清潔、油水平衡與清爽防護為主，避免只去油卻忽略補水。",
+    reason: "本次判斷偏向油光與毛孔調理需求，建議以清爽補水、局部平衡與白天防護為核心。",
+    products: ["cleanser", "balanceDew", "primer", "sun", "lotion"],
+  },
+  sensitive: {
+    label: "敏弱肌照護",
+    title: "敏弱肌｜舒緩穩定型",
+    english: "Sensitive Skin | Barrier Support",
+    focus: "依官網保養指南方向，先簡化步驟並建立穩定屏障，再慢慢加入進階修護。",
+    reason: "本次判斷偏向敏弱或不穩定狀態，建議先以舒緩、補水與屏障照護為第一順位。",
+    products: ["cleanser", "primer", "lotion", "cream", "exocell"],
+  },
+  normalCombo: {
+    label: "一般肌／混合肌照護",
+    title: "一般肌／混合肌｜日常維持型",
+    english: "Normal & Combination | Daily Balance",
+    focus: "依官網保養指南方向，維持清潔、補水、防護與局部調理，讓膚況穩定累積。",
+    reason: "本次判斷偏向日常維持與局部調整，建議用基礎步驟搭配局部加強，避免過度堆疊。",
+    products: ["cleanser", "primer", "lotion", "sun", "balanceDew", "cream"],
+  },
+  dull: {
+    label: "暗沉透亮照護",
+    title: "暗沉肌｜透亮防護型",
+    english: "Dull Skin | Radiance Defense",
+    focus: "依官網保養指南方向，白天加強防護，夜間安排透亮與補水修護，讓膚色更乾淨有光澤。",
+    reason: "本次判斷偏向暗沉與光澤不足，建議優先安排防曬、前導與提亮修護產品。",
+    products: ["cleanser", "sun", "vitalC", "primer", "lotion", "mask"],
+  },
+};
+
 function getMetricRanking(result) {
   return [
     ["hydration", result.hydration],
@@ -1508,22 +1636,44 @@ function getMetricRanking(result) {
   ].sort((a, b) => a[1] - b[1]);
 }
 
+function getGuideSkinProfile(result) {
+  const metrics = getMetricRanking(result);
+  const lowest = metrics[0][0];
+  const secondLowest = metrics[1][0];
+  const oilySignal = result.tZoneHighlightRatio > 0.075 || hasConcern("shine") || result.shine < 64;
+  const drySignal = hasConcern("hydration") || result.hydration < 64;
+  const sensitiveSignal = hasConcern("redness") || result.redness < 64 || result.zoneSignals?.cheekRedness > 7;
+  const dullSignal = hasConcern("evenness") || result.evenness < 64 || result.darkSpotRatio > 0.018;
+
+  if (sensitiveSignal && (lowest === "redness" || secondLowest === "redness")) return guideSkinProfiles.sensitive;
+  if (oilySignal && drySignal) {
+    return result.shine <= result.hydration ? guideSkinProfiles.oilyAcne : guideSkinProfiles.dry;
+  }
+  if (oilySignal && (lowest === "shine" || secondLowest === "shine")) return guideSkinProfiles.oilyAcne;
+  if (drySignal && (lowest === "hydration" || secondLowest === "hydration")) return guideSkinProfiles.dry;
+  if (dullSignal && (lowest === "evenness" || secondLowest === "evenness")) return guideSkinProfiles.dull;
+  return guideSkinProfiles.normalCombo;
+}
+
 function getShopProfile(result) {
   const metrics = getMetricRanking(result);
   const primary = metrics[0][0];
   const secondary = metrics[1][0];
   const profile = metricProfiles[primary];
+  const guideProfile = getGuideSkinProfile(result);
   const secondaryText = metricTags[secondary].replace("加強", "").replace("控光", "控油光");
-  const intensity = metrics[0][1] < 55 ? "優先照顧" : metrics[0][1] < 68 ? "建議加強" : "穩定維持";
+  const intensity = metrics[0][1] < 55 ? "優先補強" : metrics[0][1] < 68 ? "建議提升" : "穩定累積";
   const lifeText = customerProfile?.lifeLabel ? `，也把最近的「${customerProfile.lifeLabel}」納入照護節奏` : "";
+  const projection = getEnergyProjection(result);
 
   return {
-    title: `${profile.title}｜${intensity}`,
-    english: profile.english,
-    focus: `${profile.focus} 本次第二重點是${secondaryText}${customerProfile?.concernLabel ? `，並納入妳在意的「${customerProfile.concernLabel}」${lifeText}。` : "，照護步驟會依這兩個方向分層建議。"}`,
-    reason: profile.reason,
+    title: `${guideProfile.title}｜${intensity}`,
+    english: `Skin Score Plan | ${guideProfile.english}`,
+    focus: `${guideProfile.focus} 同時參考本次分數，第二重點是${secondaryText}${customerProfile?.concernLabel ? `，並納入在意的「${customerProfile.concernLabel}」${lifeText}。` : "，照護步驟會依這兩個方向分層建議。"} ${projection.rhythm}`,
+    reason: `建議原因：${guideProfile.reason} ${profile.reason}`,
     primary,
     secondary,
+    guideProfile,
   };
 }
 
@@ -1574,28 +1724,114 @@ function buildCoachLetter(result, fingerprint) {
   `;
 }
 
-function buildGrowthSystem(result) {
-  const level = result.overall >= 78 ? 4 : result.overall >= 66 ? 3 : result.overall >= 55 ? 2 : 1;
-  const levelNames = {
-    1: "肌膚啟動者",
-    2: "肌膚照護者",
-    3: "肌膚修護者",
-    4: "穩定肌膚",
+function getSkinEnergy(result) {
+  return Math.round(clamp(result.overall, 1, 100));
+}
+
+function getSkinEnergyLevel(energy) {
+  if (energy >= 96) return { level: 5, name: "梵希婗鑽石肌", min: 96, next: 100 };
+  if (energy >= 86) return { level: 4, name: "發光肌養成期", min: 86, next: 96 };
+  if (energy >= 76) return { level: 3, name: "透亮養成期", min: 76, next: 86 };
+  if (energy >= 61) return { level: 2, name: "穩定修護期", min: 61, next: 76 };
+  return { level: 1, name: "肌膚急救期", min: 0, next: 61 };
+}
+
+function getEnergyProjection(result) {
+  const metrics = getMetricRanking(result);
+  const primary = metrics[0][0];
+  const careByMetric = {
+    hydration: {
+      product: "24HR 保濕精質蜜 + 小金球・精萃",
+      direction: "先建立補水與鎖水節奏，讓乾燥紋理慢慢回到穩定狀態。",
+      rhythm: "建議先連續 7 天維持補水，再於夜間加入滋養修護。",
+    },
+    evenness: {
+      product: "裸紗／智慧防曬系列 + 亮白精華 C",
+      direction: "先把日間防護做足，再用夜間提亮節奏慢慢調整暗沉與色差。",
+      rhythm: "建議以 14 天為一個透亮觀察週期，避免一次疊太多活性產品。",
+    },
+    redness: {
+      product: "亮膚奇肌露 + 極光晶潤霜",
+      direction: "先簡化刺激來源，讓肌膚屏障進入比較安定的修護節奏。",
+      rhythm: "建議先做 7 天舒緩觀察，再視穩定度加入進階保養。",
+    },
+    shine: {
+      product: "平衡水光露 + 裸紗／智慧防曬系列",
+      direction: "先補水再調理油光，讓 T 字與兩頰不需要用同一種厚度照顧。",
+      rhythm: "建議以早上清爽、晚上修護的方式，連續觀察 7-14 天。",
+    },
   };
-  const nextName = levelNames[Math.min(level + 1, 4)];
-  const days = level >= 4 ? 7 : level === 3 ? 15 : level === 2 ? 21 : 28;
-  const growth = Math.round(clamp(result.overall * 0.72 + result.confidence * 0.28));
-  const repair = Math.round(clamp((result.hydration + result.redness) / 2));
+  const careReadiness = {
+    minimal: "先從低負擔基礎保養開始",
+    basic: "可維持基礎保濕並加入一個補強重點",
+    complete: "適合安排早晚分工的進階節奏",
+    antioxidant: "可進入抗氧與透亮的週期管理",
+    clinical: "建議以穩定修護為核心，逐步銜接功能型保養",
+  }[customerProfile?.routineHabitValue] || "可先建立穩定保養節奏";
+  const commitment = {
+    simple: "極簡照護",
+    daily: "日常穩定",
+    intensive: "加強修護",
+    completeCare: "全方位養成",
+    flexible: "彈性調整",
+  }[customerProfile?.routinePaceValue] || "保養養成";
+  return {
+    ...(careByMetric[primary] || careByMetric.hydration),
+    careReadiness,
+    commitment,
+  };
+}
+
+function readPreviousSkinEnergy() {
+  try {
+    const raw = window.localStorage?.getItem(SKIN_ENERGY_HISTORY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Number.isFinite(parsed.energy)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveSkinEnergy(energy) {
+  try {
+    window.localStorage?.setItem(SKIN_ENERGY_HISTORY_KEY, JSON.stringify({
+      energy,
+      date: new Date().toISOString().slice(0, 10),
+    }));
+  } catch {
+    // Local storage may be unavailable in some in-app browsers.
+  }
+}
+
+function buildGrowthSystem(result, previousEnergy) {
+  const energy = getSkinEnergy(result);
+  const level = getSkinEnergyLevel(energy);
+  const projection = getEnergyProjection(result);
+  const potentialLabel = energy >= 86 ? "維持發光節奏" : energy >= 76 ? "有機會進入發光養成" : energy >= 61 ? "有機會進入透亮養成" : "先進入穩定修護";
+  const progressText = previousEnergy
+    ? energy >= previousEnergy.energy
+      ? "比上次更接近下一階段"
+      : "本次分數略低於上次，建議調整保養節奏"
+    : "首次建立肌膚分數基準";
+  const progressTone = previousEnergy && energy < previousEnergy.energy ? "提醒調整" : "持續累積";
   return `
-    <span>肌膚成長系統</span>
-    <strong>Lv.${level} ${levelNames[level]}</strong>
+    <span>Skin Score Journey</span>
+    <strong>Lv.${level.level} ${level.name}</strong>
     <div class="growth-grid">
-      <b><small>肌膚成長值</small>${growth}/100</b>
-      <b><small>肌膚修護進度</small>${repair}%</b>
-      <b><small>連續保養天數</small>建議 7 天</b>
-      <b><small>回測天數</small>${days} 天後</b>
+      <b><small>目前分數</small>${energy}/100</b>
+      <b><small>上次參考</small>${previousEnergy ? `${previousEnergy.energy}/100` : "首次建立"}</b>
+      <b><small>照護節奏</small>${projection.commitment}</b>
+      <b><small>改善方向</small>${potentialLabel}</b>
     </div>
-    <p>距離 Lv.${Math.min(level + 1, 4)} ${nextName}，建議先連續照護 ${days} 天，再用同光源重新檢測追蹤。</p>
+    <div class="energy-progress">
+      <span>${progressTone}</span>
+      <strong>${progressText}</strong>
+      <small>下一階段：持續完成本次補強節奏，讓肌膚逐步往更穩定狀態推進。</small>
+    </div>
+    <small class="privacy-note">僅記錄上次分數作為本機參考，不儲存照片。</small>
+    <p>${projection.careReadiness}。本次建議搭配 ${projection.product}，${projection.direction} ${projection.rhythm}</p>
   `;
 }
 
@@ -1669,6 +1905,7 @@ function getCareRhythmInsight(result) {
 
 function getRecommendedProducts(result) {
   const metrics = getMetricRanking(result);
+  const guideProfile = getGuideSkinProfile(result);
   const paceLabel = customerProfile?.routinePaceLabel || "";
   const scenarioLabel = customerProfile?.skinScenarioLabel || "";
   const concernLabel = customerProfile?.concernLabel || "";
@@ -1679,26 +1916,31 @@ function getRecommendedProducts(result) {
     redness: 100 - result.redness,
     shine: 100 - result.shine,
   };
+  const zoneSignals = result.zoneSignals || {};
+  const zoneOil = zoneSignals.tZoneOil || 0;
+  const zoneTexture = zoneSignals.cheekTexture || 0;
+  const zoneTone = zoneSignals.tone || 0;
+  const zoneRedness = zoneSignals.cheekRedness || 0;
 
   const productScores = {
     cleanser: {
-      score: 22 + deficit.shine * 0.28 + deficit.redness * 0.18,
+      score: 22 + deficit.shine * 0.28 + deficit.redness * 0.18 + zoneOil * 0.72,
       reason: "讓清潔步驟穩定，避免後續保養被油光或髒污影響。",
     },
     lotion: {
-      score: 30 + deficit.hydration * 0.8 + deficit.redness * 0.55 + deficit.shine * 0.18,
+      score: 30 + deficit.hydration * 0.8 + deficit.redness * 0.55 + deficit.shine * 0.18 + zoneTexture * 1.4 + zoneRedness * 0.8,
       reason: "先補水打底，適合乾燥、泛紅或妝前不穩定時優先使用。",
     },
     cream: {
-      score: 14 + deficit.hydration * 0.88 + deficit.redness * 0.62 - deficit.shine * 0.28,
+      score: 14 + deficit.hydration * 0.88 + deficit.redness * 0.62 - deficit.shine * 0.28 + zoneTexture * 1.1 + zoneRedness * 1.2,
       reason: "晚間鎖水修護，適合兩頰乾、粗糙或泛紅時加強。",
     },
     sun: {
-      score: 28 + deficit.evenness * 0.78 + deficit.shine * 0.32,
+      score: 28 + deficit.evenness * 0.78 + deficit.shine * 0.32 + zoneTone * 0.9 + zoneOil * 0.35,
       reason: "白天穩定防護，膚色不均、暗沉或妝前油光時優先查看。",
     },
     vitalC: {
-      score: 6 + deficit.evenness * 1.05 + result.darkSpotRatio * 180 + (result.redness >= 62 ? 10 : -18),
+      score: 6 + deficit.evenness * 1.05 + result.darkSpotRatio * 180 + zoneTone * 1.3 + (result.redness >= 62 ? 10 : -18),
       reason: "膚色不均、暗沉與斑點感明顯時，晚間少量加入。",
     },
     mask: {
@@ -1706,19 +1948,19 @@ function getRecommendedProducts(result) {
       reason: "想加強透亮與儀式感時使用；泛紅明顯時先降低頻率。",
     },
     serum22: {
-      score: 8 + deficit.hydration * 0.92 + result.textureEnergy * 2.1 + (result.shine >= 58 ? 8 : -6),
+      score: 8 + deficit.hydration * 0.92 + result.textureEnergy * 2.1 + zoneTexture * 1.6 + (result.shine >= 58 ? 8 : -6),
       reason: "水潤感不足或紋理較明顯時，放在晚間修護步驟。",
     },
     primer: {
-      score: 34 + deficit.redness * 0.58 + deficit.evenness * 0.5 + deficit.hydration * 0.32,
+      score: 34 + deficit.redness * 0.58 + deficit.evenness * 0.5 + deficit.hydration * 0.32 + zoneRedness * 1.25 + zoneTone * 0.5,
       reason: "作為前導步驟，幫助後續保養銜接，適合泛紅、乾燥或膚色疲態時加入。",
     },
     balanceDew: {
-      score: 10 + deficit.shine * 0.82 + deficit.evenness * 0.32 + result.tZoneHighlightRatio * 120,
+      score: 10 + deficit.shine * 0.82 + deficit.evenness * 0.32 + result.tZoneHighlightRatio * 120 + zoneOil * 1.8,
       reason: "針對 T 字油光與膚況不穩，協助調理油水平衡與膚色明亮感。",
     },
     exocell: {
-      score: 6 + deficit.redness * 0.65 + deficit.hydration * 0.44 + result.textureEnergy * 1.2,
+      score: 6 + deficit.redness * 0.65 + deficit.hydration * 0.44 + result.textureEnergy * 1.2 + zoneRedness * 1.3 + zoneTexture * 0.8,
       reason: "適合修護壓力較高、屏障需要穩定或想進階加強的人。",
     },
     hydraMask: {
@@ -1862,6 +2104,9 @@ function getRecommendedProducts(result) {
     productScores.lotion.score += 12;
     productScores.cream.score += 10;
   }
+  guideProfile.products.forEach((key, index) => {
+    if (productScores[key]) productScores[key].score += 48 - index * 5;
+  });
 
   const tagForProduct = (key) => {
     const relatedMetric = metrics.find(([metricKey]) => productPriorityByMetric[metricKey].includes(key));
@@ -1893,12 +2138,17 @@ function getRecommendedProducts(result) {
     .sort((a, b) => b.priorityScore - a.priorityScore);
 
   const primaryKey = metrics[0][0];
-  const primaryProducts = productPriorityByMetric[primaryKey]
+  const guideProducts = guideProfile.products
+    .map((key) => sorted.find((product) => product.name === fascineProducts[key].name))
+    .filter(Boolean);
+  const fallbackPrimaryProducts = productPriorityByMetric[primaryKey]
     .slice(0, primaryKey === "redness" ? 2 : 3)
     .map((key) => sorted.find((product) => product.name === fascineProducts[key].name))
     .filter(Boolean);
+  const primaryProducts = (guideProducts.length ? guideProducts : fallbackPrimaryProducts).slice(0, 3);
   const answerProductKeys = new Set();
   const addAnswerProducts = (...keys) => keys.forEach((key) => answerProductKeys.add(key));
+  addAnswerProducts(...guideProfile.products);
 
   if (hasConcern("hydration")) addAnswerProducts("lotion", "cream", "serum22", "hydraMask");
   if (hasConcern("evenness")) addAnswerProducts("sun", "vitalC", "mask", "primer");
@@ -2001,11 +2251,11 @@ function renderProductRecommendations(products, profile) {
   const optionalProducts = skinProducts.slice(3);
   const priorityNames = priorityProducts.map((product) => product.name).join("、");
   fields.shopProfile.innerHTML = `
-    <span>建議購買主軸</span>
+    <span>專屬改善主軸</span>
     <strong>${profile.title}</strong>
     <em>${profile.english}</em>
     <p>${profile.reason} ${profile.focus}</p>
-    <p class="shop-priority-reason">本次建議先看：${priorityNames}。這 3 個品項會依照當前膚況與問答結果排序，先處理最明顯的保養需求，再依照肌膚反應慢慢補齊照護節奏。</p>
+    <p class="shop-priority-reason">依官網保養指南分類，本次偏向「${profile.guideProfile?.label || "日常照護"}」。建議先看：${priorityNames}。這 3 個品項會依照目前較需要照顧的狀態與問答結果排序，先處理最明顯的保養需求，再依照肌膚反應慢慢補齊照護節奏。</p>
   `;
   fields.shoppingList.innerHTML = `
     <div class="product-section product-section-basic">
@@ -2048,7 +2298,7 @@ const routineBlueprint = {
     steps: [
       ["晨間洗淨", "雙效潔顏凝露", "cleanser", "在清潔過程中形成細緻潔淨網，溫和洗淨夜間分泌皮脂與髒污，還原柔嫩水光的原始膚觸。"],
       ["前導緊緻", "亮膚奇肌露", "primer", "全方位潤澤並緊緻肌膚，賦予彈力與透亮光澤，瞬間開啟後續保養的吸收通道。"],
-      ["黃金修護", "小金球・精萃", "serum22", "為肌膚注入高營養修護能量，柔化粗糙與微細紋路，重現水潤緊緻的絲滑膚觸。"],
+      ["黃金修護", "小金球・精萃", "serum22", "為肌膚注入高營養修護養分，柔化粗糙與微細紋路，重現水潤緊緻的絲滑膚觸。"],
       ["海量注水", "24HR 保濕精質蜜", "lotion", "多重補水與鎖水機制同步啟動，維持肌膚長效含水度，打造全天候飽滿澎潤的水感肌。"],
       ["煥膚調理", "平衡水光露", "balanceDew", "溫和更新角質、調理油水平衡。舒緩肌膚不適，使膚況更加穩定，同時勻亮膚色。"],
       ["逆齡發光", "極光晶潤霜", "cream", "為肌膚注入盈潤滋養的頂級呵護，保持柔嫩與彈性，有感提升膚色明亮度、告別疲態。"],
@@ -2062,7 +2312,7 @@ const routineBlueprint = {
     steps: [
       ["深度洗淨", "雙效潔顏凝露", "cleanser", "在清潔過程中形成細緻潔淨網，溫和洗淨彩妝、殘留髒污與老廢角質，還原柔嫩水光的膚觸。"],
       ["前導緊緻", "亮膚奇肌露", "primer", "全方位潤澤並緊緻肌膚，賦予彈力與透亮光澤，瞬間開啟後續保養的吸收通道。"],
-      ["黃金修護", "小金球・精萃", "serum22", "為肌膚注入高營養修護能量，柔化粗糙與微細紋路，重現水潤緊緻的絲滑膚觸。"],
+      ["黃金修護", "小金球・精萃", "serum22", "為肌膚注入高營養修護養分，柔化粗糙與微細紋路，重現水潤緊緻的絲滑膚觸。"],
       ["海量注水", "24HR 保濕精質蜜", "lotion", "多重補水與鎖水機制同步啟動，維持肌膚長效含水度，打造全天候飽滿澎潤的水感肌。"],
       ["煥膚調理", "平衡水光露", "balanceDew", "溫和更新角質、調理油水平衡。舒緩肌膚不適，使膚況更加穩定，同時勻亮膚色。"],
       ["逆齡發光", "極光晶潤霜", "cream", "為肌膚注入盈潤滋養的頂級呵護，保持柔嫩與彈性，有感提升膚色明亮度、告別疲態。"],
@@ -2352,9 +2602,54 @@ function buildFascineRoutine(result) {
   return routine;
 }
 
+function getZoneInsight(result) {
+  const signals = result.zoneSignals || {};
+  const items = [
+    {
+      key: "tZoneOil",
+      label: "T 字油光",
+      zone: "額頭與鼻翼",
+      value: signals.tZoneOil || 0,
+      tip: "妝前可薄擦清爽保濕，白天搭配防曬與局部控光。",
+    },
+    {
+      key: "cheekTexture",
+      label: "兩頰紋理",
+      zone: "兩頰與下巴",
+      value: signals.cheekTexture || 0,
+      tip: "晚間先補水再鎖水，乾燥處可多疊一層修護霜。",
+    },
+    {
+      key: "tone",
+      label: "膚色落差",
+      zone: "額頭、兩頰與下巴",
+      value: signals.tone || 0,
+      tip: "白天防曬要足量，夜間再加入溫和提亮與穩定保濕。",
+    },
+    {
+      key: "cheekRedness",
+      label: "局部泛紅",
+      zone: "兩頰",
+      value: signals.cheekRedness || 0,
+      tip: "先簡化刺激性保養，保留舒緩、補水與屏障修護。",
+    },
+  ].sort((a, b) => b.value - a.value);
+  const primary = items[0];
+  const secondary = items[1];
+  const status = primary.value >= 10 ? "明顯" : primary.value >= 5 ? "輕微" : "穩定";
+  return {
+    title: `${primary.zone}：${primary.label}${status}`,
+    tip: `${primary.tip} 第二觀察區為${secondary.zone}，建議一起納入保養排序。`,
+    primary,
+    secondary,
+  };
+}
+
 function updateResults(result) {
   lastResult = result;
-  fields.overallScore.textContent = scoreOutOf(result.overall);
+  const skinEnergy = getSkinEnergy(result);
+  const previousEnergy = readPreviousSkinEnergy();
+  fields.overallScore.textContent = scoreOutOf(skinEnergy);
   fields.overallBar.style.width = pct(result.overall);
   const confidenceLabel = result.confidence >= 82 ? "高" : result.confidence >= 64 ? "中" : "低";
 
@@ -2372,10 +2667,10 @@ function updateResults(result) {
     field.dataset.score = scoreOutOf(score);
   });
 
-  fields.hydrationNote.textContent = `${scoreStatus(result.hydration)}｜${labelFor(result.hydration, "保水視覺良好", "局部偏乾或紋理明顯", "建議加強保濕修護")}`;
-  fields.evennessNote.textContent = `${scoreStatus(result.evenness)}｜${labelFor(result.evenness, "膚色相對均勻", "有些色差與暗沉", "色差較明顯")}`;
-  fields.rednessNote.textContent = `${scoreStatus(result.redness)}｜${labelFor(result.redness, "泛紅不明顯", "局部輕微泛紅", "泛紅比例偏高")}`;
-  fields.shineNote.textContent = `${scoreStatus(result.shine)}｜${labelFor(result.shine, "油光控制佳", "T 字或局部有亮面", "高光面積偏多")}`;
+  fields.hydrationNote.textContent = `${scoreStatus(result.hydration)}｜${labelFor(result.hydration, "水潤狀態穩定", "局部需要補水", "建議優先補水修護")}`;
+  fields.evennessNote.textContent = `${scoreStatus(result.evenness)}｜${labelFor(result.evenness, "透亮狀態穩定", "有些暗沉落差", "建議提升透亮防護")}`;
+  fields.rednessNote.textContent = `${scoreStatus(result.redness)}｜${labelFor(result.redness, "穩定狀態良好", "局部需要舒緩", "建議優先穩定屏障")}`;
+  fields.shineNote.textContent = `${scoreStatus(result.shine)}｜${labelFor(result.shine, "平衡狀態良好", "T 字局部泛光", "建議調理油水平衡")}`;
 
   const modeLabel = {
     skin: "臉部辨識良好",
@@ -2395,22 +2690,23 @@ function updateResults(result) {
   const careZoneTip = result.hydration < 58
     ? "兩頰、嘴角與額頭可優先加強補水鎖水。"
     : "臉部主要區域已可用來安排日常保養順序。";
+  const zoneInsight = getZoneInsight(result);
   const baseTip = result.shine < 58
     ? "妝前 T 字建議薄擦，兩頰照乾燥程度補足保濕。"
     : "妝前狀態相對穩定，維持輕薄防護與規律保濕即可。";
   const calmTip = result.redness < 58 ? "泛紅較明顯時，先簡化保養、降低刺激。" : "舒緩穩定度尚可。";
 
   fields.sampleMode.innerHTML = `<span class="detail-status">${hydrationLabel}</span>${labelFor(result.hydration, "肌膚表面看起來較平整，保濕維持度不錯。", "局部有乾紋或粗糙感，建議補水後再鎖水。", "乾燥紋理較明顯，建議把保濕修護排在第一優先。")}`;
-  fields.facePosition.innerHTML = `<span class="detail-status">${readAreaLabel}</span>${modeLabel}。${careZoneTip}`;
+  fields.facePosition.innerHTML = `<span class="detail-status">${readAreaLabel}</span>${modeLabel}。${careZoneTip} 主要分區觀察：${zoneInsight.title}。`;
   fields.lightingStatus.innerHTML = `<span class="detail-status">${lightLabel}</span>${lightTip}`;
   fields.colorVariance.innerHTML = `<span class="detail-status">${evennessLabel}</span>${result.evenness < 58 ? "膚色落差較明顯，建議白天防曬、晚上提亮保養同步進行。" : "膚色整體可維持，日間防護仍是透亮感關鍵。"}`;
   fields.highlightRatio.innerHTML = `<span class="detail-status">${shineLabel} / ${rednessLabel}</span>${baseTip} ${calmTip}`;
 
   const priorities = [
-    ["hydration", result.hydration, "水潤感", "先補水再鎖水，避免過度清潔。"],
-    ["evenness", result.evenness, "均勻度", "白天穩定防曬，晚上加入溫和亮膚成分。"],
-    ["redness", result.redness, "泛紅", "降低刺激，優先使用舒緩與屏障修護。"],
-    ["shine", result.shine, "油光", "保留保濕，改用輕質乳液與分區控油。"],
+    ["hydration", result.hydration, "水潤狀態", "先補水再鎖水，避免過度清潔。"],
+    ["evenness", result.evenness, "透亮狀態", "白天穩定防曬，晚上加入溫和亮膚成分。"],
+    ["redness", result.redness, "穩定狀態", "降低刺激，優先使用舒緩與屏障修護。"],
+    ["shine", result.shine, "平衡狀態", "保留保濕，改用輕質乳液與分區控油。"],
   ].sort((a, b) => a[1] - b[1]);
   const careRhythm = getCareRhythmInsight(result);
 
@@ -2427,11 +2723,11 @@ function updateResults(result) {
     </div>
   `;
   fields.coachLetter.innerHTML = buildCoachLetter(result, fingerprint);
-  fields.growthSystem.innerHTML = buildGrowthSystem(result);
+  fields.growthSystem.innerHTML = buildGrowthSystem(result, previousEnergy);
   fields.ageBenchmark.innerHTML = `
-    <span>${customerProfile?.ageLabel || "同齡"}膚況分數比較</span>
+    <span>${customerProfile?.ageLabel || "同齡"}肌膚分數參考</span>
     <div class="benchmark-compare">
-      <b><small>你的分數</small>${scoreOutOf(result.overall)}</b>
+      <b><small>目前分數</small>${scoreOutOf(skinEnergy)}</b>
       <b><small>同齡參考</small>${benchmark.range}/100</b>
     </div>
     <strong>${benchmark.status}</strong>
@@ -2441,7 +2737,10 @@ function updateResults(result) {
 
   fields.summaryList.innerHTML = priorities
     .slice(0, 3)
-    .concat([{ hideScore: true, title: careRhythm.title, tip: careRhythm.tip }])
+    .concat([
+      { hideScore: true, title: `分區觀察｜${zoneInsight.title}`, tip: zoneInsight.tip },
+      { hideScore: true, title: careRhythm.title, tip: careRhythm.tip },
+    ])
     .map(
       (item) => {
         const score = Array.isArray(item) ? item[1] : item.score;
@@ -2465,6 +2764,7 @@ function updateResults(result) {
   lastRecommendedProducts = recommendedProducts;
   renderProductRecommendations(recommendedProducts, shopProfile);
   renderRoutineRecommendations(result);
+  saveSkinEnergy(skinEnergy);
   if (copyReportButton) copyReportButton.disabled = false;
 }
 
@@ -2809,8 +3109,8 @@ document.querySelectorAll("[data-go-panel]").forEach((button) => {
         mode: "routine",
       },
       shop: {
-        title: "正在整理建議購買清單",
-        steps: ["比對本次較需要照顧的項目", "判斷出油、乾燥與穩定狀態", "整理 FASCINÉ 產品優先順序"],
+        title: "正在整理專屬改善方案",
+        steps: ["比對本次較需要照顧的狀態", "判斷出油、乾燥與穩定狀態", "整理 FASCINÉ 產品優先順序"],
         duration: 3200,
         mode: "shop",
       },

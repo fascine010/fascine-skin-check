@@ -1810,6 +1810,42 @@ body[data-journey-step="shop"] .panel.active {
   font-weight: 900;
 }
 
+.energy-progress {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(183, 95, 82, 0.18);
+  border-radius: 16px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(183, 95, 82, 0.12), transparent 10rem),
+    rgba(255, 255, 255, 0.72);
+}
+
+.energy-progress span {
+  color: var(--alert);
+  font-size: 0.76rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.energy-progress strong {
+  color: var(--ink);
+  font-size: clamp(1.05rem, 2vw, 1.38rem);
+}
+
+.energy-progress small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.privacy-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
 .skin-fingerprint::after {
   content: "AI SKIN SCAN";
   position: absolute;
