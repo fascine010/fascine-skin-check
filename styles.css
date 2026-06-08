@@ -1525,9 +1525,18 @@ canvas:active {
   color: var(--alert);
 }
 
+.upload-status.is-success {
+  color: var(--ai-cocoa);
+  font-weight: 850;
+}
+
 .upload-actions.is-error .upload-box {
   border-color: var(--alert);
   background: #FFFFFF;
+}
+
+.upload-actions.is-success .upload-box {
+  border-color: rgba(138, 106, 85, 0.34);
 }
 
 .meter-card,
@@ -1782,6 +1791,14 @@ body[data-journey-step="shop"] .panel.active {
   line-height: 1.65;
 }
 
+.growth-system .score-context {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  font-weight: 750;
+}
+
 .coach-letter small {
   color: var(--accent);
   font-weight: 900;
@@ -1798,10 +1815,11 @@ body[data-journey-step="shop"] .panel.active {
   gap: 3px;
   border: 1px solid rgba(70, 63, 55, 0.1);
   border-radius: 16px;
-  padding: 10px;
+  padding: 12px 10px;
   background: rgba(255, 255, 255, 0.72);
   color: var(--ink);
-  font-size: 1rem;
+  font-size: clamp(0.96rem, 1.8vw, 1.18rem);
+  line-height: 1.18;
 }
 
 .growth-grid small {
@@ -1837,6 +1855,65 @@ body[data-journey-step="shop"] .panel.active {
 .energy-progress small {
   color: var(--muted);
   font-weight: 800;
+  line-height: 1.5;
+}
+
+.energy-progress.comparison-good {
+  border-color: rgba(104, 126, 87, 0.22);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(104, 126, 87, 0.12), transparent 10rem),
+    rgba(255, 255, 255, 0.74);
+}
+
+.energy-progress.comparison-caution {
+  border-color: rgba(184, 89, 77, 0.25);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(184, 89, 77, 0.12), transparent 10rem),
+    rgba(255, 246, 242, 0.9);
+}
+
+.energy-progress.comparison-caution span,
+.energy-progress.comparison-caution strong {
+  color: var(--accent-strong);
+}
+
+.energy-upgrade-plan {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(138, 106, 85, 0.16);
+  border-radius: 18px;
+  padding: 13px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(250, 245, 239, 0.74)),
+    radial-gradient(circle at 100% 0%, rgba(214, 183, 132, 0.18), transparent 10rem);
+}
+
+.energy-upgrade-plan.compact-plan {
+  gap: 7px;
+}
+
+.energy-upgrade-plan b {
+  color: var(--ink);
+  font-size: 1.02rem;
+}
+
+.energy-upgrade-plan small {
+  color: var(--accent-strong);
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.energy-upgrade-plan p {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid rgba(183, 95, 82, 0.22);
+  padding-left: 10px;
+  line-height: 1.45;
+}
+
+.energy-upgrade-plan p strong {
+  color: var(--accent-strong);
+  font-size: 0.92rem;
 }
 
 .privacy-note {
@@ -1844,6 +1921,14 @@ body[data-journey-step="shop"] .panel.active {
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.5;
+}
+
+.care-potential-note {
+  border-radius: 15px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .skin-fingerprint::after {
@@ -1879,6 +1964,114 @@ body[data-journey-step="shop"] .panel.active {
   margin: 0;
   color: var(--muted);
   line-height: 1.55;
+}
+
+.fingerprint-score {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fingerprint-score b {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(70, 63, 55, 0.11);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.fingerprint-score small {
+  color: var(--accent-strong);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+}
+
+.coach-plan-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(70, 63, 55, 0.11);
+  border-radius: 18px;
+  padding: 13px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.88), transparent 10rem),
+    rgba(255, 255, 255, 0.68);
+}
+
+.coach-plan-card span {
+  color: var(--alert);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.coach-plan-card strong {
+  font-size: 1rem;
+  color: var(--accent-strong);
+}
+
+.energy-identity-card {
+  border-color: rgba(183, 95, 82, 0.16);
+}
+
+.energy-identity-card.identity-gold {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(235, 197, 113, 0.2), transparent 10rem),
+    rgba(255, 255, 255, 0.72);
+}
+
+.energy-identity-card.identity-blue {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(128, 168, 194, 0.18), transparent 10rem),
+    rgba(255, 255, 255, 0.72);
+}
+
+.energy-identity-card.identity-plum {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(150, 116, 132, 0.18), transparent 10rem),
+    rgba(255, 255, 255, 0.72);
+}
+
+.energy-identity-card.identity-green,
+.energy-identity-card.identity-cream {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(202, 181, 123, 0.18), transparent 10rem),
+    rgba(255, 255, 255, 0.72);
+}
+
+.energy-identity-card.identity-ruby {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(183, 95, 82, 0.18), transparent 10rem),
+    rgba(255, 255, 255, 0.72);
+}
+
+.energy-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.energy-tasks b,
+.energy-tasks small {
+  border: 1px solid rgba(70, 63, 55, 0.11);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.energy-tasks b {
+  color: var(--accent-strong);
 }
 
 .fingerprint-tags {
@@ -2785,6 +2978,25 @@ body[data-journey-step="shop"] .panel.active {
   margin: 0;
   color: var(--muted);
   line-height: 1.55;
+}
+
+.shop-plan {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(138, 106, 85, 0.14);
+  border-radius: 16px;
+  padding: 13px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.shop-plan b {
+  color: var(--accent-strong);
+  font-size: 1.02rem;
+}
+
+.shop-plan p {
+  padding-left: 10px;
+  border-left: 3px solid rgba(183, 95, 82, 0.22);
 }
 
 .shop-profile .shop-priority-reason {
@@ -3743,6 +3955,10 @@ body[data-journey-step="shop"] .panel.active {
   .age-benchmark,
   .shop-profile {
     padding: 13px;
+  }
+
+  .fingerprint-score {
+    grid-template-columns: 1fr;
   }
 
   .skin-fingerprint strong,

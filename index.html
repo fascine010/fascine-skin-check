@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FASCINÉ 肌膚檢測</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-1310" />
+    <link rel="stylesheet" href="styles.css?v=20260608-1641" />
   </head>
   <body>
     <main class="app-shell">
@@ -87,7 +87,7 @@
             <small class="upload-status" id="uploadStatus">照片僅供本次檢測使用，不會公開或儲存於雲端資料庫，敬請安心。</small>
 
             <div class="meter-card primary">
-              <span>AI Skin Score 肌膚狀態分數</span>
+              <span>Skin Energy 肌膚養成值</span>
               <strong id="overallScore">--</strong>
               <div class="score-bar">
                 <span id="overallBar"></span>
@@ -383,9 +383,9 @@
             <p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>
           </div>
           <div class="growth-system" id="growthSystem">
-            <span>Skin Score Journey</span>
-            <strong>等待建立肌膚分數等級</strong>
-            <p>完成檢測後，會顯示目前分數、下一等級距離與建議補強節奏。僅記錄上次分數作為本機參考，不儲存照片。</p>
+            <span>Skin Energy Journey</span>
+            <strong>等待建立肌膚養成等級</strong>
+            <p>完成檢測後，會顯示本次養成值、上次參考、肌膚等級與 60 天照護方向。僅記錄上次分數作為本機參考，不儲存照片。</p>
           </div>
           <div class="age-benchmark" id="ageBenchmark">
             <span>同齡分數參考</span>
@@ -461,7 +461,7 @@
           </div>
           <div class="shop-panel-head">
             <div>
-              <strong>根據本次 AI Skin Score，整理最適合優先提升的 FASCINÉ 照護方向。</strong>
+              <strong>根據本次 Skin Energy 與肌膚等級，整理最適合的 60 天照護方向。</strong>
               <p>如果目前容易出油、乾燥、泛紅或暗沉，系統會依照較需要照顧的狀態與問答，排序最貼近需求的產品。</p>
             </div>
           </div>
@@ -503,6 +503,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260608-1310"></script>
+    <script src="app.js?v=20260608-1641"></script>
   </body>
 </html>

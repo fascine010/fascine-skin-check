@@ -215,10 +215,17 @@ function updateWelcomeStats() {
     return clamp(10 + monthlyLift + dayVariation + hourLift, 10, 29);
   };
   const today = dailyCountFor(dateIndex, true);
-  const monthBase = 88 + (seededNumber(monthSeed + 11) % 12);
+  const monthlyCountFor = (dayIndex, includeTodayProgress = false) => {
+    const loopDay = String(dayIndex).padStart(2, "0");
+    const loopSeed = Number(`${year}${month}${loopDay}`);
+    const dayLift = seededNumber(loopSeed + 49) % 2;
+    const progressLift = includeTodayProgress ? Math.min(1, Math.floor(now.getHours() / 12)) : 1;
+    return dayLift + progressLift;
+  };
+  const monthBase = 40 + (seededNumber(monthSeed + 11) % 5);
   let monthly = monthBase;
   for (let dayIndex = 1; dayIndex <= dateIndex; dayIndex += 1) {
-    monthly += dailyCountFor(dayIndex, dayIndex === dateIndex);
+    monthly += monthlyCountFor(dayIndex, dayIndex === dateIndex);
   }
   const stability = 93 + (seededNumber(daySeed + dayOfYear) % 4);
 
@@ -304,7 +311,7 @@ function reset() {
   renderAlignedFaceMesh(null);
   fields.skinFingerprint.innerHTML = "<span>AI 臉部膚況辨識</span><strong>等待檢測</strong><p>完成檢測後，會整理你目前偏向的肌膚狀態與保養主軸。</p>";
   fields.coachLetter.innerHTML = "<span>AI 顧問給妳的一封信</span><p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>";
-  fields.growthSystem.innerHTML = "<span>Skin Score Journey</span><strong>等待建立肌膚分數等級</strong><p>完成檢測後，會顯示目前分數、下一等級距離與建議補強節奏。僅記錄上次分數作為本機參考，不儲存照片。</p>";
+  fields.growthSystem.innerHTML = "<span>Skin Energy Journey</span><strong>等待建立肌膚養成等級</strong><p>完成檢測後，會顯示本次養成值、上次參考、肌膚等級與 60 天照護方向。僅記錄上次分數作為本機參考，不儲存照片。</p>";
   fields.ageBenchmark.innerHTML = "<span>同齡分數參考</span><strong>等待年齡資料</strong><p>完成膚況問答後，這裡會顯示同年齡層建議維持的分數區間。</p>";
   fields.summaryList.innerHTML = "<p>完成檢測後，這裡會顯示你的主要肌膚觀察與保養方向。</p>";
   fields.sampleMode.textContent = "上傳照片後，這裡會觀察肌膚的水潤與細緻感。";
@@ -333,7 +340,9 @@ function stopCamera() {
 function setUploadStatus(message, type = "neutral") {
   uploadStatus.textContent = message;
   uploadStatus.classList.toggle("is-error", type === "error");
+  uploadStatus.classList.toggle("is-success", type === "success");
   uploadActions.classList.toggle("is-error", type === "error");
+  uploadActions.classList.toggle("is-success", type === "success");
 }
 
 const consultationLabels = {
@@ -624,7 +633,22 @@ function updateStartAnalysisState() {
   startAnalysisButton.disabled = !isReady;
 }
 
-function preparePhotoForConsultation(fileName = "照片") {
+function getPhotoReadinessMessage(fileName = "照片", detected = false) {
+  const box = getSkinDetectionBox();
+  if (!box || !detected) {
+    return `已載入：${fileName}。請把臉部置中對齊紅色框，完成後再進入膚況諮詢。`;
+  }
+
+  const faceRatio = box.detectedWidth / Math.max(box.detectedHeight, 1);
+  const isCentered = Math.abs(((box.minX + box.maxX) / 2 / canvas.width) * 100 - defaultFaceGuide.x) < 15;
+  const sizeLabel = box.detectedWidth > canvas.width * 0.26 ? "臉部比例可判讀" : "臉部略小，可放大或靠近一點";
+  const centerLabel = isCentered ? "臉部已置中" : "臉部可再微調至框線中心";
+  const shapeLabel = faceRatio > 0.42 && faceRatio < 1.46 ? "輪廓讀取穩定" : "角度略有偏移";
+
+  return `已完成照片校準：${centerLabel}、${sizeLabel}、${shapeLabel}。可以進入膚況諮詢。`;
+}
+
+function preparePhotoForConsultation(fileName = "照片", detected = false) {
   lastResult = null;
   lastRoutine = [];
   lastRecommendedProducts = [];
@@ -634,7 +658,7 @@ function preparePhotoForConsultation(fileName = "照片") {
   viewResultButton.textContent = "下一步：回答膚況問題";
   renderPreviewOnly();
   updateStartAnalysisState();
-  setUploadStatus(`已準備好：${fileName}。請確認臉部對準後，進入膚況問答。`);
+  setUploadStatus(getPhotoReadinessMessage(fileName, detected), detected ? "success" : "neutral");
 }
 
 function resetFaceGuide() {
@@ -1228,6 +1252,8 @@ function analyzeSkin() {
   const isValidFaceRead =
     mode !== "raw" &&
     mode !== "image" &&
+    faceReadConfidence >= 42 &&
+    skinRatio >= (isCameraPhoto ? 0.055 : 0.07) &&
     (detectedFaceShape || strongOvalFace || relaxedCameraFace);
 
   if (!isValidFaceRead) {
@@ -1398,6 +1424,9 @@ function analyzeSkin() {
     mode,
     avgBrightness: avg.brightness,
     confidence,
+    faceReadConfidence,
+    skinRatio,
+    faceGuideSnapshot: { ...faceGuide },
   };
 }
 
@@ -1665,15 +1694,18 @@ function getShopProfile(result) {
   const intensity = metrics[0][1] < 55 ? "優先補強" : metrics[0][1] < 68 ? "建議提升" : "穩定累積";
   const lifeText = customerProfile?.lifeLabel ? `，也把最近的「${customerProfile.lifeLabel}」納入照護節奏` : "";
   const projection = getEnergyProjection(result);
+  const coachPlan = getSkinCoachPlan(result);
 
   return {
     title: `${guideProfile.title}｜${intensity}`,
-    english: `Skin Score Plan | ${guideProfile.english}`,
-    focus: `${guideProfile.focus} 同時參考本次分數，第二重點是${secondaryText}${customerProfile?.concernLabel ? `，並納入在意的「${customerProfile.concernLabel}」${lifeText}。` : "，照護步驟會依這兩個方向分層建議。"} ${projection.rhythm}`,
+    english: `Skin Energy Plan | ${guideProfile.english}`,
+    focus: `${guideProfile.focus} 同時參考本次養成值，第二重點是${secondaryText}${customerProfile?.concernLabel ? `，並納入在意的「${customerProfile.concernLabel}」${lifeText}。` : "，照護步驟會依這兩個方向分層建議。"} ${projection.rhythm}`,
     reason: `建議原因：${guideProfile.reason} ${profile.reason}`,
     primary,
     secondary,
     guideProfile,
+    coachPlan,
+    upgradePlan: getSixtyDayUpgradePlan(result),
   };
 }
 
@@ -1708,6 +1740,64 @@ function getSkinFingerprint(result) {
   };
 }
 
+function getSkinCoachPlan(result) {
+  const metrics = getMetricRanking(result);
+  const primary = metrics[0][0];
+  const secondary = metrics[1][0];
+  const hasStressLoad = hasLifeFactor("sleep") || hasLifeFactor("stress") || hasLifeFactor("busy") || hasLifeFactor("selfcare");
+  const plans = {
+    hydration: {
+      insight: "目前不是單純乾燥，而是補水後的鎖水與修護節奏還不夠穩，肌膚容易在清潔後或冷氣環境中出現緊繃感。",
+      barrierTitle: "目前最大阻礙：補水後沒有穩定鎖住",
+      barrierText: "如果只補水、不鎖水，水潤感會很快下降，也會讓妝前服貼度變不穩。",
+      planTitle: "7 天補水穩定方案",
+      day1: "先保留清潔、奇肌露、精質蜜與晚間鎖水，讓肌膚減少乾燥拉扯。",
+      day3: "觀察兩頰與嘴角緊繃感，若仍偏乾，晚間加上小金球或霜類鎖水。",
+      day7: "回測時用同光源拍照，主要看水潤狀態與妝前服貼感是否更穩。",
+      task: "今晚任務：清潔後先用奇肌露，再用精質蜜按壓全臉，乾燥處加強鎖水。",
+    },
+    shine: {
+      insight: "目前不一定是單純油性肌，更像油水節奏不平衡。表面出油時，肌底可能仍需要清爽補水。",
+      barrierTitle: "目前最大阻礙：只控油，補水不足",
+      barrierText: "只把油光壓掉，反而可能讓兩頰乾、T 字更容易反覆泛光。",
+      planTitle: "7 天清爽平衡方案",
+      day1: "先把清潔、奇肌露、水光露與防曬排好，白天保養維持輕薄。",
+      day3: "T 字局部用水光露，兩頰保留精質蜜，避免全臉使用同一種厚度。",
+      day7: "回測時觀察 T 字反光與妝前穩定度，確認是否比第一次更細緻。",
+      task: "今日任務：T 字薄擦、兩頰補水，防曬足量但避免過厚堆疊。",
+    },
+    redness: {
+      insight: "目前肌膚比較需要先被安撫。泛紅或不穩不代表膚況差，而是屏障正在提醒你先降低刺激。",
+      barrierTitle: "目前最大阻礙：修護速度跟不上消耗",
+      barrierText: "當壓力、作息或換季影響累積時，肌膚容易對保養品和環境變得更敏感。",
+      planTitle: "7 天舒緩修護方案",
+      day1: "先簡化保養，只保留溫和清潔、奇肌露、精質蜜與晚間霜類修護。",
+      day3: "暫緩高刺激亮白或酸類，觀察泛紅、刺感與乾癢是否下降。",
+      day7: "若穩定度提升，再逐步加入提亮或加強型精華，不要一次全疊。",
+      task: "今晚任務：減少功能型疊加，先用舒緩補水與屏障修護把膚況穩住。",
+    },
+    evenness: {
+      insight: "目前主要不是膚色不好，而是光澤與防護節奏需要重新拉起來。暗沉常和睡眠、防曬與保濕穩定度一起出現。",
+      barrierTitle: "目前最大阻礙：白天防護與夜間提亮沒有形成週期",
+      barrierText: "如果白天防曬不足，晚上再多提亮也容易被日間消耗抵銷。",
+      planTitle: "14 天透亮防護方案",
+      day1: "先把防曬用量補足，晚上保留補水，讓肌膚有穩定修護環境。",
+      day3: "晚間可少量加入亮白精華 C，先每週 2-3 次觀察適應度。",
+      day7: "觀察膚色均勻與疲態感；若肌膚穩定，再安排面膜或進階提亮。",
+      task: "今日任務：白天防曬足量，晚上先補水修護，再安排溫和提亮。",
+    },
+  };
+  const plan = plans[primary] || plans.hydration;
+  const stressNote = hasStressLoad
+    ? "另外，這次問答中有生活壓力或作息訊號，建議先把保養做穩，不急著一次加很多功能型產品。"
+    : "";
+  return {
+    ...plan,
+    secondaryLabel: metricTags[secondary],
+    stressNote,
+  };
+}
+
 function buildCoachLetter(result, fingerprint) {
   const name = "親愛的妳";
   const lifeText = customerProfile?.lifeLabel
@@ -1734,6 +1824,151 @@ function getSkinEnergyLevel(energy) {
   if (energy >= 76) return { level: 3, name: "透亮養成期", min: 76, next: 86 };
   if (energy >= 61) return { level: 2, name: "穩定修護期", min: 61, next: 76 };
   return { level: 1, name: "肌膚急救期", min: 0, next: 61 };
+}
+
+function getSkinEnergyGoal(energy) {
+  const level = getSkinEnergyLevel(energy);
+  if (level.level >= 5) {
+    return {
+      gap: 0,
+      nextLabel: "維持梵希婗鑽石肌",
+      text: "目前已進入最高等級，重點是穩定維持與週期修護。",
+    };
+  }
+  const nextLevel = getSkinEnergyLevel(level.next);
+  const gap = Math.max(0, level.next - energy);
+  return {
+    gap,
+    nextLabel: `距離 Lv.${nextLevel.level} ${nextLevel.name}`,
+    text: `距離 Lv.${nextLevel.level} ${nextLevel.name} 還差 ${gap} 點。`,
+  };
+}
+
+function getHabitGrowthPotential(result) {
+  let boost = 0;
+  const notes = [];
+  const add = (value, note) => {
+    boost += value;
+    if (note) notes.push(note);
+  };
+
+  if (customerProfile?.routineHabitValue === "complete") add(4, "已有進階保養習慣，適合建立早晚分工。");
+  if (customerProfile?.routineHabitValue === "antioxidant") add(6, "有抗氧與面膜習慣，可進入週期養成。");
+  if (customerProfile?.routineHabitValue === "clinical") add(5, "有機能保養經驗，建議以穩定修護銜接。");
+  if (customerProfile?.routinePaceValue === "intensive") add(5, "可接受加強保養，適合安排重點品項。");
+  if (customerProfile?.routinePaceValue === "completeCare") add(7, "可執行完整步驟，成長節奏會更完整。");
+  if (customerProfile?.routinePaceValue === "daily") add(3, "早晚基礎節奏穩定，適合累積保養效果。");
+  if (hasScenario("makeup")) add(3, "有妝前服貼需求，防護與油水平衡目標明確。");
+  if (hasScenario("season")) add(3, "有穩定屏障需求，可先做舒緩修護週期。");
+  if (hasLifeFactor("sleep") || hasLifeFactor("stress") || hasLifeFactor("busy")) add(2, "已看見生活壓力訊號，適合先從低負擔修護開始。");
+  if (result.hydration >= 72) add(2, "水潤基礎不差，後續可往透亮與穩定推進。");
+  if (result.redness >= 72) add(2, "穩定度尚可，進階產品可更好銜接。");
+
+  const potential = Math.round(clamp(getSkinEnergy(result) + boost, 1, 99));
+  return {
+    boost: Math.round(clamp(boost, 0, 18)),
+    potential,
+    notes: notes.slice(0, 3),
+  };
+}
+
+function getSkinEnergyIdentity(result) {
+  const metrics = getMetricRanking(result);
+  const primary = metrics[0][0];
+  if (hasScenario("ageing") || hasConcern("fineLines")) {
+    return {
+      title: "初老鬆弛型",
+      tone: "ruby",
+      text: "肌膚目前需要把滋養、彈潤與防護放進同一個節奏，讓輪廓與細緻度慢慢回到穩定狀態。",
+      tasks: ["晚間加入滋養修護", "白天防曬足量", "每週固定觀察紋理變化"],
+    };
+  }
+  if (hasLifeFactor("sleep") || hasLifeFactor("busy") || hasScenario("stress")) {
+    return {
+      title: "熬夜暗沉型",
+      tone: "plum",
+      text: "最近的消耗比較高，肌膚不是變差，而是修護速度開始追不上生活節奏。",
+      tasks: ["今晚提早完成保養", "白天補足防護", "先連續 7 天維持補水修護"],
+    };
+  }
+  if (primary === "redness") {
+    return {
+      title: "敏弱修護型",
+      tone: "blue",
+      text: "肌膚對環境與保養刺激比較敏感，現階段先穩住屏障，比一次加入太多功能型產品更重要。",
+      tasks: ["先簡化保養品項", "晚間加強屏障修護", "暫緩高刺激產品"],
+    };
+  }
+  if (primary === "shine") {
+    return {
+      title: "油水平衡型",
+      tone: "gold",
+      text: "目前看起來需要控光，但核心是補水與油脂調理一起做，妝前才會更細緻。",
+      tasks: ["T 字局部調理", "兩頰保留補水", "防曬用量均勻但避免厚疊"],
+    };
+  }
+  if (primary === "evenness") {
+    return {
+      title: "透亮養成型",
+      tone: "cream",
+      text: "膚色與光澤需要靠白天防護、夜間修護慢慢累積，適合用週期方式養成透亮感。",
+      tasks: ["白天防曬足量", "夜間溫和提亮", "每週用同光源觀察光澤"],
+    };
+  }
+  return {
+    title: "缺水乾荒型",
+    tone: "green",
+    text: "肌膚正在提醒你先補水、再鎖水。把基礎保濕打穩，後面提亮與修護會更好銜接。",
+    tasks: ["清潔後立即補水", "晚間加入鎖水", "冷氣環境加強兩頰保濕"],
+  };
+}
+
+function getSixtyDayUpgradePlan(result) {
+  const metrics = getMetricRanking(result);
+  const primary = metrics[0][0];
+  const plans = {
+    hydration: {
+      title: "60 天補水修護計畫",
+      focus: "穩定含水量與鎖水節奏",
+      product: "24HR 保濕精質蜜、小金球・精萃",
+      stages: [
+        ["0-7 天", "建立水潤基準", "固定補水與鎖水，先讓乾燥拉扯感下降。"],
+        ["8-28 天", "加強夜間修護", "依乾燥程度加入滋養修護，穩住兩頰與嘴角。"],
+        ["29-60 天", "澎潤維持", "觀察水潤、妝前服貼與細緻感是否更穩。"],
+      ],
+    },
+    evenness: {
+      title: "60 天透亮防護計畫",
+      focus: "白天防護與夜間提亮",
+      product: "裸紗／智慧防曬系列、亮白精華 C",
+      stages: [
+        ["0-7 天", "補足日間防護", "白天防曬足量，夜間先以補水修護打底。"],
+        ["8-28 天", "加入溫和提亮", "肌膚穩定後，再建立晚間提亮週期。"],
+        ["29-60 天", "穩定光澤", "觀察膚色均勻度與疲態感是否更明顯改善。"],
+      ],
+    },
+    redness: {
+      title: "60 天舒緩穩定計畫",
+      focus: "屏障穩定與低刺激修護",
+      product: "亮膚奇肌露、極光晶潤霜",
+      stages: [
+        ["0-7 天", "降低刺激來源", "先簡化保養，保留舒緩、補水與晚間修護。"],
+        ["8-28 天", "建立屏障節奏", "觀察泛紅與刺感，再逐步銜接加強品項。"],
+        ["29-60 天", "穩定後再加強", "肌膚穩定後再加入進階修護，避免一次更換太多。"],
+      ],
+    },
+    shine: {
+      title: "60 天清爽平衡計畫",
+      focus: "油水平衡與妝前控光",
+      product: "平衡水光露、裸紗／智慧防曬系列",
+      stages: [
+        ["0-7 天", "先補水再控光", "T 字薄擦調理，兩頰保留補水。"],
+        ["8-28 天", "建立分區保養", "白天清爽防護，夜間補水修護。"],
+        ["29-60 天", "妝前穩定維持", "讓妝前服貼與清爽度更穩定。"],
+      ],
+    },
+  };
+  return plans[primary] || plans.hydration;
 }
 
 function getEnergyProjection(result) {
@@ -1794,11 +2029,65 @@ function readPreviousSkinEnergy() {
   }
 }
 
-function saveSkinEnergy(energy) {
+function getResultComparisonSignature(result) {
+  if (!result) return null;
+  const guide = result.faceGuideSnapshot || faceGuide;
+  return {
+    avgBrightness: Math.round(result.avgBrightness || 0),
+    sideBalance: Math.round(result.sideBalance || 0),
+    faceWidth: Math.round(guide.width || 0),
+    faceHeight: Math.round(guide.height || 0),
+    faceX: Math.round(guide.x || 0),
+    faceY: Math.round(guide.y || 0),
+    confidence: Math.round(result.confidence || 0),
+    faceReadConfidence: Math.round(result.faceReadConfidence || 0),
+    mode: result.mode || "",
+  };
+}
+
+function getRetestComparison(previous, result) {
+  if (!previous?.signature || !result) {
+    return {
+      tone: "first",
+      title: "首次建立肌膚分數基準",
+      note: "建議之後回測時使用相同光源、相近角度與正面照片，分數會更適合作為前後比較。",
+    };
+  }
+
+  const current = getResultComparisonSignature(result);
+  const previousSignature = previous.signature;
+  const lightGap = Math.abs(current.avgBrightness - (previousSignature.avgBrightness || 0));
+  const faceSizeGap = Math.abs(current.faceWidth - (previousSignature.faceWidth || 0)) + Math.abs(current.faceHeight - (previousSignature.faceHeight || 0));
+  const facePositionGap = Math.abs(current.faceX - (previousSignature.faceX || 0)) + Math.abs(current.faceY - (previousSignature.faceY || 0));
+  const confidenceGap = Math.abs(current.confidence - (previousSignature.confidence || 0));
+  const comparable = lightGap <= 28 && faceSizeGap <= 11 && facePositionGap <= 16 && confidenceGap <= 24;
+
+  if (comparable) {
+    return {
+      tone: "good",
+      title: "本次照片條件接近上次，適合做回測參考",
+      note: "光線、臉部比例與框架位置相近，因此上次與本次分數可以作為日常保養追蹤依據。",
+    };
+  }
+
+  const reasons = [];
+  if (lightGap > 28) reasons.push("光線不同");
+  if (faceSizeGap > 11 || facePositionGap > 16) reasons.push("臉部距離或位置不同");
+  if (confidenceGap > 24) reasons.push("讀取清晰度不同");
+
+  return {
+    tone: "caution",
+    title: "本次拍攝條件與上次不同，分數先作單次參考",
+    note: `${reasons.join("、") || "拍攝條件有差異"}，建議下次用相同光源、正面置中再回測，變化會更有參考價值。`,
+  };
+}
+
+function saveSkinEnergy(energy, result) {
   try {
     window.localStorage?.setItem(SKIN_ENERGY_HISTORY_KEY, JSON.stringify({
       energy,
       date: new Date().toISOString().slice(0, 10),
+      signature: getResultComparisonSignature(result),
     }));
   } catch {
     // Local storage may be unavailable in some in-app browsers.
@@ -1808,30 +2097,44 @@ function saveSkinEnergy(energy) {
 function buildGrowthSystem(result, previousEnergy) {
   const energy = getSkinEnergy(result);
   const level = getSkinEnergyLevel(energy);
-  const projection = getEnergyProjection(result);
-  const potentialLabel = energy >= 86 ? "維持發光節奏" : energy >= 76 ? "有機會進入發光養成" : energy >= 61 ? "有機會進入透亮養成" : "先進入穩定修護";
+  const goal = getSkinEnergyGoal(energy);
+  const habitPotential = getHabitGrowthPotential(result);
+  const upgradePlan = getSixtyDayUpgradePlan(result);
+  const comparison = getRetestComparison(previousEnergy, result);
+  const delta = previousEnergy ? energy - previousEnergy.energy : 0;
   const progressText = previousEnergy
-    ? energy >= previousEnergy.energy
-      ? "比上次更接近下一階段"
-      : "本次分數略低於上次，建議調整保養節奏"
-    : "首次建立肌膚分數基準";
-  const progressTone = previousEnergy && energy < previousEnergy.energy ? "提醒調整" : "持續累積";
+    ? delta > 0
+      ? `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，已往下一階段前進。`
+      : delta === 0
+        ? `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，目前維持穩定。`
+        : `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，本次先調整保養節奏。`
+    : "首次建立 Skin Energy 基準，之後用相同光源回測會更適合比較。";
+  const progressTone = delta < 0 ? "提醒調整" : previousEnergy ? "改善追蹤" : "建立基準";
+  const potentialNote = habitPotential.notes.length
+    ? habitPotential.notes.join(" ")
+    : "先把基礎保養固定 7 天，再依肌膚反應加入加強品項。";
   return `
-    <span>Skin Score Journey</span>
+    <span>Skin Energy Journey</span>
     <strong>Lv.${level.level} ${level.name}</strong>
     <div class="growth-grid">
-      <b><small>目前分數</small>${energy}/100</b>
-      <b><small>上次參考</small>${previousEnergy ? `${previousEnergy.energy}/100` : "首次建立"}</b>
-      <b><small>照護節奏</small>${projection.commitment}</b>
-      <b><small>改善方向</small>${potentialLabel}</b>
+      <b><small>本次分數</small>${energy}/100</b>
+      <b><small>上次／本次</small>${previousEnergy ? `${previousEnergy.energy} → ${energy}` : "首次建立"}</b>
+      <b><small>照護潛力</small>${habitPotential.potential}/100</b>
+      <b><small>下一階段</small>${goal.gap ? `${goal.gap} 點` : "維持頂級"}</b>
     </div>
-    <div class="energy-progress">
+    <div class="energy-progress comparison-${comparison.tone}">
       <span>${progressTone}</span>
       <strong>${progressText}</strong>
-      <small>下一階段：持續完成本次補強節奏，讓肌膚逐步往更穩定狀態推進。</small>
+      <small>${comparison.title}。${comparison.note}</small>
     </div>
+    <p class="score-context">${goal.text} 養成值代表目前照護階段與下一步方向，不是肌膚好壞判定。</p>
+    <div class="energy-upgrade-plan compact-plan">
+      <b>${upgradePlan.title}</b>
+      <small>本次主軸：${upgradePlan.focus}｜建議搭配：${upgradePlan.product}</small>
+      ${upgradePlan.stages.map(([day, title, text]) => `<p><strong>${day} ${title}</strong>${text}</p>`).join("")}
+    </div>
+    <p class="care-potential-note">${potentialNote}</p>
     <small class="privacy-note">僅記錄上次分數作為本機參考，不儲存照片。</small>
-    <p>${projection.careReadiness}。本次建議搭配 ${projection.product}，${projection.direction} ${projection.rhythm}</p>
   `;
 }
 
@@ -2117,14 +2420,14 @@ function getRecommendedProducts(result) {
     const primary = metrics[0][0];
     const secondary = metrics[1][0];
     const priorityText = productPriorityByMetric[primary].includes(key)
-      ? "本次照護計畫第一順位。"
+      ? "對應本次最需要照顧的狀態。"
       : productPriorityByMetric[secondary].includes(key)
-        ? "搭配加強本次第二照護重點。"
-        : "作為延伸補充，讓整套照護更完整。";
+        ? "搭配補強第二觀察重點。"
+        : "作為延伸照護，讓流程更完整。";
     const answerText = customerProfile
-      ? `依你選擇「${concernLabel}、${scenarioLabel}、${paceLabel}」調整排序。`
+      ? `依「${concernLabel || "目前膚況"}、${scenarioLabel || "日常需求"}、${paceLabel || "保養節奏"}」排序。`
       : "";
-    return `${priorityText}${answerText}${fascineProducts[key].keyBenefit}：${baseReason}`;
+    return `${priorityText}${answerText}${fascineProducts[key].keyBenefit}。`;
   };
 
   const sorted = Object.entries(productScores)
@@ -2250,11 +2553,26 @@ function renderProductRecommendations(products, profile) {
   const priorityProducts = skinProducts.slice(0, 3);
   const optionalProducts = skinProducts.slice(3);
   const priorityNames = priorityProducts.map((product) => product.name).join("、");
+  const upgradePlan = profile.upgradePlan || {
+    title: "60 天照護計畫",
+    focus: "穩定保養節奏",
+    product: priorityNames,
+    stages: [
+      ["0-7 天", "建立基準", "先固定基礎保養，觀察肌膚穩定度。"],
+      ["8-28 天", "加入重點品項", "依本次較低分項加入優先產品。"],
+      ["29-60 天", "維持節奏", "用相同光源回測，觀察狀態是否更穩。"],
+    ],
+  };
   fields.shopProfile.innerHTML = `
     <span>專屬改善主軸</span>
     <strong>${profile.title}</strong>
     <em>${profile.english}</em>
     <p>${profile.reason} ${profile.focus}</p>
+    <div class="shop-plan energy-upgrade-plan">
+      <b>${upgradePlan.title}</b>
+      <small>主軸：${upgradePlan.focus}｜建議搭配：${upgradePlan.product}</small>
+      ${upgradePlan.stages.map(([day, title, text]) => `<p><strong>${day} ${title}</strong>${text}</p>`).join("")}
+    </div>
     <p class="shop-priority-reason">依官網保養指南分類，本次偏向「${profile.guideProfile?.label || "日常照護"}」。建議先看：${priorityNames}。這 3 個品項會依照目前較需要照顧的狀態與問答結果排序，先處理最明顯的保養需求，再依照肌膚反應慢慢補齊照護節奏。</p>
   `;
   fields.shoppingList.innerHTML = `
@@ -2268,9 +2586,9 @@ function renderProductRecommendations(products, profile) {
       </div>
     </div>
     <div class="product-section">
-      <div class="product-section-title">
-        <span>Priority 01</span>
-        <strong>本次優先建議</strong>
+        <div class="product-section-title">
+        <span>Care Essentials</span>
+        <strong>60 天照護優先品項</strong>
       </div>
       <div class="product-grid-inner">
         ${priorityProducts.map((product) => renderProductCard(product)).join("")}
@@ -2280,7 +2598,7 @@ function renderProductRecommendations(products, profile) {
       <div class="product-section product-section-optional">
         <div class="product-section-title">
           <span>Optional Care</span>
-          <strong>想加強再查看</strong>
+          <strong>想加強照護再查看</strong>
         </div>
         <div class="product-grid-inner">
           ${optionalProducts.map((product) => renderProductCard(product)).join("")}
@@ -2651,7 +2969,6 @@ function updateResults(result) {
   const previousEnergy = readPreviousSkinEnergy();
   fields.overallScore.textContent = scoreOutOf(skinEnergy);
   fields.overallBar.style.width = pct(result.overall);
-  const confidenceLabel = result.confidence >= 82 ? "高" : result.confidence >= 64 ? "中" : "低";
 
   fields.hydrationScore.textContent = scoreOutOf(result.hydration);
   fields.evennessScore.textContent = scoreOutOf(result.evenness);
@@ -2691,6 +3008,7 @@ function updateResults(result) {
     ? "兩頰、嘴角與額頭可優先加強補水鎖水。"
     : "臉部主要區域已可用來安排日常保養順序。";
   const zoneInsight = getZoneInsight(result);
+  const comparison = getRetestComparison(previousEnergy, result);
   const baseTip = result.shine < 58
     ? "妝前 T 字建議薄擦，兩頰照乾燥程度補足保濕。"
     : "妝前狀態相對穩定，維持輕薄防護與規律保濕即可。";
@@ -2711,11 +3029,30 @@ function updateResults(result) {
   const careRhythm = getCareRhythmInsight(result);
 
   const fingerprint = getSkinFingerprint(result);
+  const identity = getSkinEnergyIdentity(result);
+  const upgradePlan = getSixtyDayUpgradePlan(result);
+  const habitPotential = getHabitGrowthPotential(result);
   const benchmark = getAgeBenchmark(result);
+  const firstPriority = priorities[0];
+  const secondPriority = priorities[1];
   fields.skinFingerprint.innerHTML = `
     <span>AI 膚況顧問觀察</span>
-    <strong>${fingerprint.title}</strong>
-    <p>${fingerprint.note}</p>
+    <strong>${identity.title}</strong>
+    <div class="fingerprint-score">
+      <b><small>肌膚養成值</small>${scoreOutOf(skinEnergy)}</b>
+      <b><small>優先照護</small>${firstPriority[2]}</b>
+      <b><small>第二重點</small>${secondPriority[2]}</b>
+    </div>
+    <p>${identity.text} 本次重點是依照膚況順序，安排最適合的照護節奏。</p>
+    <div class="coach-plan-card energy-identity-card identity-${identity.tone}">
+      <span>今日肌膚身份</span>
+      <strong>${identity.title}</strong>
+      <p>${fingerprint.note}</p>
+      <div class="energy-tasks">
+        <b>專屬任務</b>
+        ${identity.tasks.map((task) => `<small>${task}</small>`).join("")}
+      </div>
+    </div>
     <div class="fingerprint-tags">
       <b>${fingerprint.primaryLabel}</b>
       <b>${fingerprint.secondaryLabel}</b>
@@ -2736,9 +3073,11 @@ function updateResults(result) {
   `;
 
   fields.summaryList.innerHTML = priorities
-    .slice(0, 3)
+    .slice(0, 2)
     .concat([
-      { hideScore: true, title: `分區觀察｜${zoneInsight.title}`, tip: zoneInsight.tip },
+      { hideScore: true, title: `Skin Energy｜Lv.${getSkinEnergyLevel(skinEnergy).level} ${getSkinEnergyLevel(skinEnergy).name}`, tip: `本次養成值 ${skinEnergy}/100，照護潛力 ${habitPotential.potential}/100。` },
+      { hideScore: true, title: `60 天照護方向｜${upgradePlan.title}`, tip: `${upgradePlan.focus}。先從 ${upgradePlan.stages[0][1]} 開始。` },
+      { hideScore: true, title: "今日肌膚任務", tip: identity.tasks.join("、") },
       { hideScore: true, title: careRhythm.title, tip: careRhythm.tip },
     ])
     .map(
@@ -2764,7 +3103,7 @@ function updateResults(result) {
   lastRecommendedProducts = recommendedProducts;
   renderProductRecommendations(recommendedProducts, shopProfile);
   renderRoutineRecommendations(result);
-  saveSkinEnergy(skinEnergy);
+  saveSkinEnergy(skinEnergy, result);
   if (copyReportButton) copyReportButton.disabled = false;
 }
 
@@ -2853,8 +3192,7 @@ async function handleImage(file, source = "upload") {
     drawImageCover(loadedImage);
     const fitted = autoFitPhotoToFace();
     const detected = fitted || await autoDetectFaceGuide();
-    setUploadStatus(detected ? `已自動校準臉部位置：${fileName}` : `已載入：${fileName}，請拖曳紅色框對準臉部。`);
-    preparePhotoForConsultation(fileName);
+    preparePhotoForConsultation(fileName, detected);
   };
 
   const failLoad = () => {
@@ -3003,14 +3341,14 @@ autoAlignButton.addEventListener("click", async () => {
   drawImageCover(loadedImage);
   const fitted = autoFitPhotoToFace();
   const detected = fitted || await autoDetectFaceGuide();
-  if (!detected) {
-    resetFaceGuide();
-    setUploadStatus("臉部位置不夠清楚，請把紅色框拖曳到臉部主要區域。", "error");
-  } else {
-    setUploadStatus("已重新定位臉部區域。");
-  }
-  preparePhotoForConsultation("目前照片");
-});
+	  if (!detected) {
+	    resetFaceGuide();
+	    preparePhotoForConsultation("目前照片", false);
+	    setUploadStatus("臉部位置不夠清楚，請把紅色框拖曳到臉部主要區域。", "error");
+	    return;
+	  }
+	  preparePhotoForConsultation("目前照片", true);
+	});
 
 Object.values(alignmentInputs).forEach((input) => {
   input.addEventListener("input", () => {
@@ -3020,9 +3358,9 @@ Object.values(alignmentInputs).forEach((input) => {
       width: Number(alignmentInputs.width.value),
       height: Number(alignmentInputs.height.value),
     });
-    preparePhotoForConsultation("目前照片");
-  });
-});
+	    preparePhotoForConsultation("目前照片", true);
+	  });
+	});
 
 canvas.addEventListener("pointerdown", (event) => {
   if (!loadedImage) return;
@@ -3071,16 +3409,16 @@ canvas.addEventListener("pointerup", () => {
   isDraggingGuide = false;
   isDraggingPhoto = false;
   pendingPhotoDrag = false;
-  if (shouldAnalyze) preparePhotoForConsultation("目前照片");
-});
+	  if (shouldAnalyze) preparePhotoForConsultation("目前照片", true);
+	});
 
 canvas.addEventListener("pointercancel", () => {
   const shouldAnalyze = isDraggingGuide || (isDraggingPhoto && !pendingPhotoDrag);
   isDraggingGuide = false;
   isDraggingPhoto = false;
   pendingPhotoDrag = false;
-  if (shouldAnalyze) preparePhotoForConsultation("目前照片");
-});
+	  if (shouldAnalyze) preparePhotoForConsultation("目前照片", true);
+	});
 
 canvas.addEventListener("wheel", (event) => {
   if (!loadedImage) return;
