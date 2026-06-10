@@ -161,7 +161,7 @@ const scoreStatus = (score) => {
 const pct = (value) => `${Math.round(clamp(value))}%`;
 const displayScore = (score) => {
   const value = clamp(score, 1, 99);
-  return clamp(50 + Math.sqrt(value / 99) * 36 + value * 0.08, 52, 96);
+  return clamp(58 + Math.sqrt(value / 99) * 38 + value * 0.07, 60, 99);
 };
 
 function setJourneyStep(step, panel = null) {
@@ -309,9 +309,9 @@ function reset() {
   fields.analysisFacePreview.removeAttribute("src");
   fields.scanFacePhoto.src = "assets/scan-face-woman.png";
   renderAlignedFaceMesh(null);
-  fields.skinFingerprint.innerHTML = "<span>AI 臉部膚況辨識</span><strong>等待檢測</strong><p>完成檢測後，會整理你目前偏向的肌膚狀態與保養主軸。</p>";
+  fields.skinFingerprint.innerHTML = "<span>本次肌膚定位</span><strong>等待檢測</strong><p>完成檢測後，會整理目前肌膚狀態、優先照護方向與保養追蹤重點。</p>";
   fields.coachLetter.innerHTML = "<span>AI 顧問給妳的一封信</span><p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>";
-  fields.growthSystem.innerHTML = "<span>Skin Energy Journey</span><strong>等待建立肌膚養成等級</strong><p>完成檢測後，會顯示本次養成值、上次參考、肌膚等級與 60 天照護方向。僅記錄上次分數作為本機參考，不儲存照片。</p>";
+  fields.growthSystem.innerHTML = "<span>Skin Score Progress</span><strong>等待建立肌膚分數等級</strong><p>完成檢測後，會顯示本次分數、上次參考、肌膚等級與 60 天照護方向。僅記錄上次分數作為本機參考，不儲存照片。</p>";
   fields.ageBenchmark.innerHTML = "<span>同齡分數參考</span><strong>等待年齡資料</strong><p>完成膚況問答後，這裡會顯示同年齡層建議維持的分數區間。</p>";
   fields.summaryList.innerHTML = "<p>完成檢測後，這裡會顯示你的主要肌膚觀察與保養方向。</p>";
   fields.sampleMode.textContent = "上傳照片後，這裡會觀察肌膚的水潤與細緻感。";
@@ -540,16 +540,16 @@ function calibrateConsumerScoreRange(scores, maintainedSkinLift = 0) {
   const average = values.reduce((sum, score) => sum + score, 0) / values.length;
   const habitLift = {
     minimal: -1,
-    basic: 2,
-    complete: 8,
-    antioxidant: 11,
-    clinical: 7,
+    basic: 6,
+    complete: 14,
+    antioxidant: 17,
+    clinical: 14,
   }[customerProfile?.routineHabitValue] || 0;
   const paceLift = {
     simple: 0,
-    daily: 2,
-    intensive: 4,
-    completeCare: 6,
+    daily: 4,
+    intensive: 7,
+    completeCare: 9,
     flexible: 1,
   }[customerProfile?.routinePaceValue] || 0;
   const stressLoad = [
@@ -557,15 +557,15 @@ function calibrateConsumerScoreRange(scores, maintainedSkinLift = 0) {
     ...(customerProfile?.lifeValues || []),
     ...(customerProfile?.skinScenarioValues || []),
   ].length;
-  const skinSignalLift = clamp((maintainedSkinLift - 1.8) * 1.5, -2, 4);
-  const targetAverage = clamp(64 + habitLift + paceLift + skinSignalLift - Math.min(4, stressLoad * 0.45), 60, 82);
+  const skinSignalLift = clamp((maintainedSkinLift - 1.2) * 2.4, -2, 9);
+  const targetAverage = clamp(74 + habitLift + paceLift + skinSignalLift - Math.min(4, stressLoad * 0.28), 70, 92);
   const effectiveAverage = average < targetAverage
     ? targetAverage
-    : clamp(average + Math.max(0, habitLift + paceLift) * 0.25, targetAverage, 88);
+    : clamp(average + Math.max(0, habitLift + paceLift) * 0.34 + Math.max(0, maintainedSkinLift - 2) * 0.65, targetAverage, 96);
 
   for (const key of Object.keys(adjusted)) {
     const personalSpread = (adjusted[key] - average) * 0.9;
-    adjusted[key] = clamp(effectiveAverage + personalSpread, 56, 92);
+    adjusted[key] = clamp(effectiveAverage + personalSpread, 64, 98);
   }
 
   return adjusted;
@@ -1249,11 +1249,14 @@ function analyzeSkin() {
   const strongOvalFace = relaxedDetectedShape && activePixels.length >= 220 && skinCandidateCount >= 110 && skinRatio >= 0.075;
   const relaxedCameraFace = isCameraPhoto && activePixels.length >= 180 && skinCandidateCount >= 85 && skinRatio >= 0.055;
   const faceReadConfidence = clamp(skinRatio * 100 + Math.min(activePixels.length, 2600) / 52 + faceAreaRatio * 18, 0, 100);
+  const enoughFaceArea = faceAreaRatio >= (isCameraPhoto ? 0.18 : 0.2);
+  const plausibleSkinRead = skinCandidateCount >= (isCameraPhoto ? 95 : 120) && skinRatio >= (isCameraPhoto ? 0.058 : 0.074);
   const isValidFaceRead =
     mode !== "raw" &&
     mode !== "image" &&
-    faceReadConfidence >= 42 &&
-    skinRatio >= (isCameraPhoto ? 0.055 : 0.07) &&
+    faceReadConfidence >= (isCameraPhoto ? 43 : 46) &&
+    enoughFaceArea &&
+    plausibleSkinRead &&
     (detectedFaceShape || strongOvalFace || relaxedCameraFace);
 
   if (!isValidFaceRead) {
@@ -1386,7 +1389,24 @@ function analyzeSkin() {
   const calibratedScores = calibrateConsumerScoreRange(personalizedScores, maintainedSkinLift);
   const finalScores = spreadCloseMetricScores(separateTiedMetricScores(calibratedScores, concernSignals), concernSignals);
   const { hydration, evenness, redness, shine } = finalScores;
-  const overall = clamp(hydration * 0.25 + evenness * 0.32 + redness * 0.22 + shine * 0.21, 52, 96);
+  const longTermCareBonus = {
+    minimal: 0,
+    basic: 1.2,
+    complete: 3.2,
+    antioxidant: 4.2,
+    clinical: 3.4,
+  }[customerProfile?.routineHabitValue] || 0;
+  const commitmentBonus = {
+    simple: 0,
+    daily: 0.8,
+    intensive: 1.5,
+    completeCare: 2,
+    flexible: 0.4,
+  }[customerProfile?.routinePaceValue] || 0;
+  const stableSkinBonus = mode === "skin"
+    ? clamp(maintainedSkinLift * 1.35 + balancedLightBonus * 0.9 + Math.max(0, faceReadConfidence - 56) * 0.06 + longTermCareBonus + commitmentBonus - Math.max(0, sideBalance - 14) * 0.08, 0, 11)
+    : 0;
+  const overall = clamp(hydration * 0.25 + evenness * 0.32 + redness * 0.22 + shine * 0.21 + stableSkinBonus, 64, 99);
   const confidence = clamp(
     96
       - modePenalty * 3
@@ -1698,8 +1718,8 @@ function getShopProfile(result) {
 
   return {
     title: `${guideProfile.title}｜${intensity}`,
-    english: `Skin Energy Plan | ${guideProfile.english}`,
-    focus: `${guideProfile.focus} 同時參考本次養成值，第二重點是${secondaryText}${customerProfile?.concernLabel ? `，並納入在意的「${customerProfile.concernLabel}」${lifeText}。` : "，照護步驟會依這兩個方向分層建議。"} ${projection.rhythm}`,
+    english: `Skin Score Plan | ${guideProfile.english}`,
+    focus: `${guideProfile.focus} 同時參考本次分數，第二重點是${secondaryText}${customerProfile?.concernLabel ? `，並納入在意的「${customerProfile.concernLabel}」${lifeText}。` : "，照護步驟會依這兩個方向分層建議。"} ${projection.rhythm}`,
     reason: `建議原因：${guideProfile.reason} ${profile.reason}`,
     primary,
     secondary,
@@ -1799,17 +1819,15 @@ function getSkinCoachPlan(result) {
 }
 
 function buildCoachLetter(result, fingerprint) {
-  const name = "親愛的妳";
   const lifeText = customerProfile?.lifeLabel
-    ? `這次問答中，我們也看見妳最近可能有「${customerProfile.lifeLabel}」的狀態。`
-    : "這次問答中，我們也看見妳願意停下來，好好了解自己的肌膚。";
+    ? `這次也參考了最近的「${customerProfile.lifeLabel}」狀態，讓保養建議更貼近日常。`
+    : "這次已建立本次肌膚基準，之後可用相同光源與角度回測，觀察保養累積變化。";
   return `
-    <span>AI 顧問給妳的一封信</span>
-    <strong>${name}</strong>
-    <p>謝謝妳願意花時間了解自己。</p>
+    <span>AI 顧問追蹤提醒</span>
+    <strong>這次不是結束，而是肌膚養成的起點</strong>
     <p>${lifeText}</p>
-    <p>妳的肌膚其實沒有想像中糟糕，它只是正在提醒妳：該把一點關心留給自己了。</p>
-    <p>未來的保養，不是為了變成別人，而是讓自己維持最舒服的狀態。接下來，就交給我們陪妳一起改善。</p>
+    <p>接下來 7-14 天，先依照本次優先順序穩定保養。再次檢測時，重點會放在水潤、穩定、透亮與平衡是否更靠近理想狀態。</p>
+    <p>分數的意義不是評價肌膚，而是幫助你看見保養是否正在往更穩定的方向累積。</p>
     <small>— 梵希婗 FASCINÉ</small>
   `;
 }
@@ -1840,7 +1858,7 @@ function getSkinEnergyGoal(energy) {
   return {
     gap,
     nextLabel: `距離 Lv.${nextLevel.level} ${nextLevel.name}`,
-    text: `距離 Lv.${nextLevel.level} ${nextLevel.name} 還差 ${gap} 點。`,
+    text: `距離 Lv.${nextLevel.level} ${nextLevel.name} 還差 ${gap} 分。`,
   };
 }
 
@@ -2104,30 +2122,30 @@ function buildGrowthSystem(result, previousEnergy) {
   const delta = previousEnergy ? energy - previousEnergy.energy : 0;
   const progressText = previousEnergy
     ? delta > 0
-      ? `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，已往下一階段前進。`
+      ? `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，提升 ${delta} 分，保養狀態正在往更穩定的方向累積。`
       : delta === 0
-        ? `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，目前維持穩定。`
-        : `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，本次先調整保養節奏。`
-    : "首次建立 Skin Energy 基準，之後用相同光源回測會更適合比較。";
+        ? `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，目前維持穩定，建議延續本次照護節奏。`
+        : `上次 ${previousEnergy.energy}/100 → 本次 ${energy}/100，本次可能受光線、作息或保養節奏影響，先依建議調整 7 天。`
+    : "已建立本次 Skin Score 基準；建議連續保養 7-14 天後，用相同光源再次回測。";
   const progressTone = delta < 0 ? "提醒調整" : previousEnergy ? "改善追蹤" : "建立基準";
   const potentialNote = habitPotential.notes.length
     ? habitPotential.notes.join(" ")
     : "先把基礎保養固定 7 天，再依肌膚反應加入加強品項。";
   return `
-    <span>Skin Energy Journey</span>
+    <span>Skin Score Progress</span>
     <strong>Lv.${level.level} ${level.name}</strong>
     <div class="growth-grid">
       <b><small>本次分數</small>${energy}/100</b>
       <b><small>上次／本次</small>${previousEnergy ? `${previousEnergy.energy} → ${energy}` : "首次建立"}</b>
       <b><small>照護潛力</small>${habitPotential.potential}/100</b>
-      <b><small>下一階段</small>${goal.gap ? `${goal.gap} 點` : "維持頂級"}</b>
+      <b><small>下一階段</small>${goal.gap ? `${goal.gap} 分` : "維持頂級"}</b>
     </div>
     <div class="energy-progress comparison-${comparison.tone}">
       <span>${progressTone}</span>
       <strong>${progressText}</strong>
       <small>${comparison.title}。${comparison.note}</small>
     </div>
-    <p class="score-context">${goal.text} 養成值代表目前照護階段與下一步方向，不是肌膚好壞判定。</p>
+    <p class="score-context">${goal.text} 建議把這次分數當作肌膚基準，之後回測時觀察趨勢，而不是只看單次高低。</p>
     <div class="energy-upgrade-plan compact-plan">
       <b>${upgradePlan.title}</b>
       <small>本次主軸：${upgradePlan.focus}｜建議搭配：${upgradePlan.product}</small>
@@ -2276,6 +2294,42 @@ function getRecommendedProducts(result) {
     },
   };
 
+  const applyGuidePriorityBoost = (keys, boost = 0) => {
+    keys.forEach((key, index) => {
+      if (productScores[key]) productScores[key].score += boost - index * 3;
+    });
+  };
+
+  if (guideProfile === guideSkinProfiles.dry) {
+    applyGuidePriorityBoost(["lotion", "serum22", "cream", "primer", "hydraMask"], 34);
+    productScores.balanceDew.score -= 12;
+    productScores.cleanser.score -= 4;
+  }
+
+  if (guideProfile === guideSkinProfiles.oilyAcne) {
+    applyGuidePriorityBoost(["cleanser", "balanceDew", "primer", "sun", "lotion"], 34);
+    productScores.cream.score -= 12;
+    productScores.serum22.score -= 6;
+    productScores.mask.score -= 8;
+  }
+
+  if (guideProfile === guideSkinProfiles.sensitive) {
+    applyGuidePriorityBoost(["primer", "lotion", "cream", "exocell", "cleanser"], 36);
+    productScores.vitalC.score -= 18;
+    productScores.mask.score -= 12;
+    productScores.balanceDew.score -= 8;
+  }
+
+  if (guideProfile === guideSkinProfiles.dull) {
+    applyGuidePriorityBoost(["sun", "vitalC", "primer", "lotion", "mask"], 34);
+    productScores.balanceDew.score -= 6;
+    productScores.cream.score -= 4;
+  }
+
+  if (guideProfile === guideSkinProfiles.normalCombo) {
+    applyGuidePriorityBoost(["cleanser", "primer", "lotion", "sun", "balanceDew"], 24);
+  }
+
   if (hasConcern("hydration")) {
     productScores.lotion.score += 24;
     productScores.cream.score += 18;
@@ -2408,7 +2462,7 @@ function getRecommendedProducts(result) {
     productScores.cream.score += 10;
   }
   guideProfile.products.forEach((key, index) => {
-    if (productScores[key]) productScores[key].score += 48 - index * 5;
+    if (productScores[key]) productScores[key].score += 40 - index * 4;
   });
 
   const tagForProduct = (key) => {
@@ -3036,20 +3090,20 @@ function updateResults(result) {
   const firstPriority = priorities[0];
   const secondPriority = priorities[1];
   fields.skinFingerprint.innerHTML = `
-    <span>AI 膚況顧問觀察</span>
+    <span>本次肌膚定位</span>
     <strong>${identity.title}</strong>
     <div class="fingerprint-score">
-      <b><small>肌膚養成值</small>${scoreOutOf(skinEnergy)}</b>
+      <b><small>肌膚分數</small>${scoreOutOf(skinEnergy)}</b>
       <b><small>優先照護</small>${firstPriority[2]}</b>
       <b><small>第二重點</small>${secondPriority[2]}</b>
     </div>
-    <p>${identity.text} 本次重點是依照膚況順序，安排最適合的照護節奏。</p>
+    <p>${identity.text} 本次建議先穩定「${firstPriority[2]}」，再逐步照顧「${secondPriority[2]}」，下次回測時就能更清楚看到變化。</p>
     <div class="coach-plan-card energy-identity-card identity-${identity.tone}">
-      <span>今日肌膚身份</span>
+      <span>7 天照護重點</span>
       <strong>${identity.title}</strong>
       <p>${fingerprint.note}</p>
       <div class="energy-tasks">
-        <b>專屬任務</b>
+        <b>回測前先做</b>
         ${identity.tasks.map((task) => `<small>${task}</small>`).join("")}
       </div>
     </div>
@@ -3075,7 +3129,7 @@ function updateResults(result) {
   fields.summaryList.innerHTML = priorities
     .slice(0, 2)
     .concat([
-      { hideScore: true, title: `Skin Energy｜Lv.${getSkinEnergyLevel(skinEnergy).level} ${getSkinEnergyLevel(skinEnergy).name}`, tip: `本次養成值 ${skinEnergy}/100，照護潛力 ${habitPotential.potential}/100。` },
+      { hideScore: true, title: `Skin Score｜Lv.${getSkinEnergyLevel(skinEnergy).level} ${getSkinEnergyLevel(skinEnergy).name}`, tip: `本次分數 ${skinEnergy}/100，照護潛力 ${habitPotential.potential}/100。` },
       { hideScore: true, title: `60 天照護方向｜${upgradePlan.title}`, tip: `${upgradePlan.focus}。先從 ${upgradePlan.stages[0][1]} 開始。` },
       { hideScore: true, title: "今日肌膚任務", tip: identity.tasks.join("、") },
       { hideScore: true, title: careRhythm.title, tip: careRhythm.tip },

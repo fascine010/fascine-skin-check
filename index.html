@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FASCINÉ 肌膚檢測</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-1641" />
+    <link rel="stylesheet" href="styles.css?v=20260610-result-growth" />
   </head>
   <body>
     <main class="app-shell">
@@ -87,7 +87,7 @@
             <small class="upload-status" id="uploadStatus">照片僅供本次檢測使用，不會公開或儲存於雲端資料庫，敬請安心。</small>
 
             <div class="meter-card primary">
-              <span>Skin Energy 肌膚養成值</span>
+              <span>Skin Score 肌膚分數</span>
               <strong id="overallScore">--</strong>
               <div class="score-bar">
                 <span id="overallBar"></span>
@@ -321,8 +321,9 @@
       <section class="insights">
         <section class="panel active" id="summary" aria-label="AI 膚況解析">
           <div class="panel-title">
-            <p class="eyebrow">Step 03 / AI Result</p>
-            <h2>FASCINÉ AI 顧問檢測報告</h2>
+            <p class="eyebrow">Step 03 / Skin Score Report</p>
+            <h2>FASCINÉ 肌膚成長報告</h2>
+            <span>本次結果會作為肌膚基準；之後用相同光源回測，就能更清楚看見保養累積的變化。</span>
           </div>
           <div class="analysis-visual">
             <div class="face-scan-widget" aria-label="AI 臉部掃描">
@@ -374,18 +375,18 @@
             </div>
           </div>
           <div class="skin-fingerprint" id="skinFingerprint">
-            <span>AI 臉部膚況辨識</span>
+            <span>本次肌膚定位</span>
             <strong>等待檢測</strong>
-            <p>完成檢測後，會整理你目前偏向的肌膚狀態與保養主軸。</p>
+            <p>完成檢測後，會整理目前肌膚狀態、優先照護方向與保養追蹤重點。</p>
           </div>
           <div class="coach-letter" id="coachLetter">
             <span>AI 顧問給妳的一封信</span>
             <p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>
           </div>
           <div class="growth-system" id="growthSystem">
-            <span>Skin Energy Journey</span>
-            <strong>等待建立肌膚養成等級</strong>
-            <p>完成檢測後，會顯示本次養成值、上次參考、肌膚等級與 60 天照護方向。僅記錄上次分數作為本機參考，不儲存照片。</p>
+            <span>Skin Score Progress</span>
+            <strong>等待建立肌膚分數等級</strong>
+            <p>完成檢測後，會顯示本次分數、上次參考、肌膚等級與 60 天照護方向。僅記錄上次分數作為本機參考，不儲存照片。</p>
           </div>
           <div class="age-benchmark" id="ageBenchmark">
             <span>同齡分數參考</span>
@@ -461,7 +462,7 @@
           </div>
           <div class="shop-panel-head">
             <div>
-              <strong>根據本次 Skin Energy 與肌膚等級，整理最適合的 60 天照護方向。</strong>
+              <strong>根據本次 Skin Score 與肌膚等級，整理最適合的 60 天照護方向。</strong>
               <p>如果目前容易出油、乾燥、泛紅或暗沉，系統會依照較需要照顧的狀態與問答，排序最貼近需求的產品。</p>
             </div>
           </div>
@@ -503,6 +504,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260608-1641"></script>
+    <script src="app.js?v=20260610-result-growth"></script>
   </body>
 </html>

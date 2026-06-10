@@ -1734,6 +1734,16 @@ body[data-journey-step="shop"] .panel.active {
   line-height: 1.12;
 }
 
+.panel-title > span {
+  display: block;
+  max-width: 760px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
 .summary-list {
   display: grid;
   gap: 10px;
@@ -1748,8 +1758,8 @@ body[data-journey-step="shop"] .panel.active {
   border-radius: 22px;
   padding: 16px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(243, 226, 196, 0.48), transparent 12rem),
-    radial-gradient(circle at 0% 100%, rgba(235, 200, 193, 0.22), transparent 12rem),
+    radial-gradient(circle at 100% 0%, rgba(243, 226, 196, 0.58), transparent 12rem),
+    radial-gradient(circle at 0% 100%, rgba(235, 200, 193, 0.28), transparent 12rem),
     #FAF5EF;
   box-shadow: var(--shadow-soft);
   overflow: hidden;
@@ -1765,7 +1775,8 @@ body[data-journey-step="shop"] .panel.active {
   border-radius: 22px;
   padding: 16px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.78), transparent 12rem),
+    radial-gradient(circle at 100% 0%, rgba(243, 226, 196, 0.36), transparent 12rem),
+    radial-gradient(circle at 0% 100%, rgba(183, 95, 82, 0.08), transparent 14rem),
     linear-gradient(135deg, #FFFFFF 0%, #FAF5EF 100%);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
@@ -1835,7 +1846,7 @@ body[data-journey-step="shop"] .panel.active {
   border-radius: 16px;
   padding: 12px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(183, 95, 82, 0.12), transparent 10rem),
+    radial-gradient(circle at 100% 0%, rgba(183, 95, 82, 0.16), transparent 10rem),
     rgba(255, 255, 255, 0.72);
 }
 
