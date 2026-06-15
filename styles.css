@@ -1810,6 +1810,15 @@ body[data-journey-step="shop"] .panel.active {
   font-weight: 750;
 }
 
+.growth-system .retest-note {
+  border: 1px solid rgba(184, 94, 82, 0.12);
+  border-radius: 16px;
+  padding: 11px 13px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .coach-letter small {
   color: var(--accent);
   font-weight: 900;
@@ -2643,6 +2652,7 @@ body[data-journey-step="shop"] .panel.active {
 }
 
 .routine-hero,
+.routine-priority-summary,
 .ai-advice-bubble,
 .care-cycle {
   position: relative;
@@ -2656,6 +2666,33 @@ body[data-journey-step="shop"] .panel.active {
     linear-gradient(135deg, #FFFFFF 0%, #FAF5EF 100%);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
+}
+
+.routine-priority-summary {
+  background:
+    radial-gradient(circle at 92% 10%, rgba(184, 94, 82, 0.11), transparent 12rem),
+    radial-gradient(circle at 0% 100%, rgba(218, 188, 135, 0.22), transparent 13rem),
+    linear-gradient(135deg, #FFFFFF 0%, #FAF5EF 100%);
+}
+
+.routine-priority-summary span,
+.shop-guidance-note b {
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.routine-priority-summary strong {
+  color: var(--ink);
+  font-size: clamp(1.12rem, 2.2vw, 1.45rem);
+}
+
+.routine-priority-summary p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .routine-hero {
@@ -3010,11 +3047,25 @@ body[data-journey-step="shop"] .panel.active {
   border-left: 3px solid rgba(183, 95, 82, 0.22);
 }
 
-.shop-profile .shop-priority-reason {
+.shop-guidance-note {
+  display: grid;
+  gap: 7px;
   border-top: 1px solid rgba(70, 63, 55, 0.1);
-  padding-top: 9px;
+  padding-top: 11px;
+}
+
+.shop-guidance-note p {
   color: var(--ink);
   font-weight: 800;
+}
+
+.shop-guidance-note small {
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(250, 245, 239, 0.8);
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.55;
 }
 
 .product-section {
@@ -4000,10 +4051,30 @@ body[data-journey-step="shop"] .panel.active {
   }
 
   .routine-hero,
+  .routine-priority-summary,
   .ai-advice-bubble,
   .care-cycle {
     border-radius: 16px;
     padding: 14px;
+  }
+
+  body[data-journey-step="result"] .coach-letter p:nth-of-type(n+3),
+  body[data-journey-step="result"] .energy-upgrade-plan p:nth-of-type(n+3),
+  body[data-journey-step="result"] .care-potential-note {
+    display: none;
+  }
+
+  body[data-journey-step="result"] .growth-system,
+  body[data-journey-step="result"] .coach-letter,
+  body[data-journey-step="result"] .skin-fingerprint,
+  body[data-journey-step="result"] .age-benchmark {
+    margin-bottom: 10px;
+  }
+
+  body[data-journey-step="result"] .growth-system .score-context,
+  body[data-journey-step="result"] .growth-system .retest-note {
+    padding: 10px 11px;
+    font-size: 0.86rem;
   }
 
   .routine-hero {

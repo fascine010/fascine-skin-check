@@ -310,7 +310,7 @@ function reset() {
   fields.scanFacePhoto.src = "assets/scan-face-woman.png";
   renderAlignedFaceMesh(null);
   fields.skinFingerprint.innerHTML = "<span>本次肌膚定位</span><strong>等待檢測</strong><p>完成檢測後，會整理目前肌膚狀態、優先照護方向與保養追蹤重點。</p>";
-  fields.coachLetter.innerHTML = "<span>AI 顧問給妳的一封信</span><p>完成檢測後，這裡會整理一段專屬於妳的肌膚照護提醒。</p>";
+  fields.coachLetter.innerHTML = "<span>AI 顧問追蹤提醒</span><p>完成檢測後，這裡會整理一段專屬肌膚照護提醒。</p>";
   fields.growthSystem.innerHTML = "<span>Skin Score Progress</span><strong>等待建立肌膚分數等級</strong><p>完成檢測後，會顯示本次分數、上次參考、肌膚等級與 60 天照護方向。僅記錄上次分數作為本機參考，不儲存照片。</p>";
   fields.ageBenchmark.innerHTML = "<span>同齡分數參考</span><strong>等待年齡資料</strong><p>完成膚況問答後，這裡會顯示同年齡層建議維持的分數區間。</p>";
   fields.summaryList.innerHTML = "<p>完成檢測後，這裡會顯示你的主要肌膚觀察與保養方向。</p>";
@@ -2145,7 +2145,8 @@ function buildGrowthSystem(result, previousEnergy) {
       <strong>${progressText}</strong>
       <small>${comparison.title}。${comparison.note}</small>
     </div>
-    <p class="score-context">${goal.text} 建議把這次分數當作肌膚基準，之後回測時觀察趨勢，而不是只看單次高低。</p>
+    <p class="score-context">${goal.text} Skin Score 是本次照片光線、臉部狀態與問答綜合後的保養參考，不代表肌膚好壞。建議把這次分數當作基準，之後用相同光源回測，觀察水潤、透亮與穩定度是否慢慢往上。</p>
+    <p class="retest-note">小提醒：若下次照片角度、光線或臉部距離差很多，系統會先判斷為單次參考；同條件回測的變化才最有價值。</p>
     <div class="energy-upgrade-plan compact-plan">
       <b>${upgradePlan.title}</b>
       <small>本次主軸：${upgradePlan.focus}｜建議搭配：${upgradePlan.product}</small>
@@ -2159,11 +2160,11 @@ function buildGrowthSystem(result, previousEnergy) {
 function getAgeBenchmark(result) {
   const ageValue = customerProfile?.ageValue || "30s";
   const benchmarks = {
-    under20: { range: "78-86", target: 82, label: "年輕肌穩定參考", note: "此年齡層通常以油水平衡、清爽度與防曬習慣作為維持重點。" },
-    "20s": { range: "76-84", target: 80, label: "20+ 肌膚參考", note: "此年齡層建議把保濕、防曬與作息穩定做好，避免暗沉與油光反覆。" },
-    "30s": { range: "72-82", target: 77, label: "30+ 肌膚參考", note: "此年齡層可開始重視補水鎖水、透亮度與妝前穩定度。" },
-    "40s": { range: "68-78", target: 73, label: "40+ 肌膚參考", note: "此年齡層建議把修護、保濕與日間防護放在核心位置。" },
-    "50up": { range: "64-76", target: 70, label: "熟齡肌參考", note: "此年齡層可優先看重滋潤度、柔嫩感與屏障穩定。" },
+    under20: { range: "82-90", target: 86, label: "年輕肌理想維持參考", note: "此年齡層通常以油水平衡、清爽度與防曬習慣作為維持重點。" },
+    "20s": { range: "80-88", target: 84, label: "20+ 肌膚理想參考", note: "此年齡層建議把保濕、防曬與作息穩定做好，避免暗沉與油光反覆。" },
+    "30s": { range: "76-86", target: 81, label: "30+ 肌膚理想參考", note: "此年齡層可開始重視補水鎖水、透亮度與妝前穩定度。" },
+    "40s": { range: "72-82", target: 77, label: "40+ 肌膚理想參考", note: "此年齡層建議把修護、保濕與日間防護放在核心位置。" },
+    "50up": { range: "68-80", target: 74, label: "熟齡肌理想參考", note: "此年齡層可優先看重滋潤度、柔嫩感與屏障穩定。" },
   };
   const benchmark = benchmarks[ageValue] || benchmarks["30s"];
   const gap = Math.round(result.overall - benchmark.target);
@@ -2627,7 +2628,11 @@ function renderProductRecommendations(products, profile) {
       <small>主軸：${upgradePlan.focus}｜建議搭配：${upgradePlan.product}</small>
       ${upgradePlan.stages.map(([day, title, text]) => `<p><strong>${day} ${title}</strong>${text}</p>`).join("")}
     </div>
-    <p class="shop-priority-reason">依官網保養指南分類，本次偏向「${profile.guideProfile?.label || "日常照護"}」。建議先看：${priorityNames}。這 3 個品項會依照目前較需要照顧的狀態與問答結果排序，先處理最明顯的保養需求，再依照肌膚反應慢慢補齊照護節奏。</p>
+    <div class="shop-guidance-note">
+      <b>為什麼先推薦這幾個</b>
+      <p>依官網保養指南分類，本次偏向「${profile.guideProfile?.label || "日常照護"}」。建議先看：${priorityNames}。這幾個品項會依照目前較需要照顧的狀態與問答結果排序，先處理最明顯的保養需求，再依照肌膚反應慢慢補齊照護節奏。</p>
+      <small>若想降低購買壓力，可先從「基礎必備」加上「本次優先」開始，7-14 天後再依回測狀態加強。</small>
+    </div>
   `;
   fields.shoppingList.innerHTML = `
     <div class="product-section product-section-basic">
@@ -2750,15 +2755,45 @@ function getScoreAdaptations(result) {
   return metrics.flatMap((key) => pool[key]).slice(0, 4);
 }
 
+function getRoutinePrioritySummary(result) {
+  const labels = {
+    hydration: "水潤保濕",
+    evenness: "透亮光澤",
+    redness: "舒緩穩定",
+    shine: "油水平衡",
+  };
+  const ranking = getMetricRanking(result);
+  const primary = ranking[0]?.[0] || "hydration";
+  const secondary = ranking[1]?.[0] || "evenness";
+  const lowestScore = ranking[0]?.[1] || result.overall;
+  const primaryText = labels[primary] || "保養穩定";
+  const secondaryText = labels[secondary] || "日常防護";
+  const paceText = lowestScore >= 78
+    ? "目前狀態維持度不錯，建議以穩定節奏為主，避免一次更換太多產品。"
+    : lowestScore >= 66
+      ? "目前適合先連續保養 7 天，讓肌膚建立穩定感，再加入加強型品項。"
+      : "目前建議先簡化流程，把保濕、舒緩與防護固定下來，再觀察肌膚反應。";
+  return {
+    title: `本次先照顧 ${primaryText}，再搭配 ${secondaryText}`,
+    text: `${paceText} 回測時建議維持相同光源與角度，分數變化才會更貼近真實保養累積。`,
+  };
+}
+
 function renderRoutineRecommendations(result) {
   const mode = currentRoutineMode;
   const routine = routineBlueprint[mode] || routineBlueprint.day;
   const modeAdvice = getRoutineModeAdvice(result);
   const scoreAdvice = getScoreAdaptations(result);
+  const prioritySummary = getRoutinePrioritySummary(result);
   document.querySelectorAll("[data-routine-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.routineTab === mode);
   });
   fields.routineList.innerHTML = `
+    <section class="routine-priority-summary">
+      <span>本次照護重點</span>
+      <strong>${prioritySummary.title}</strong>
+      <p>${prioritySummary.text}</p>
+    </section>
     <section class="routine-hero ${mode}">
       <span>${routine.icon}</span>
       <div>
