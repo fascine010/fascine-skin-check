@@ -206,26 +206,20 @@ function updateWelcomeStats() {
   const monthSeed = Number(`${year}${month}`);
   const dateIndex = now.getDate();
   const dayOfYear = Math.floor((now - new Date(year, 0, 0)) / 86400000);
-  const dailyCountFor = (dayIndex, includeTodayProgress = false) => {
-    const loopDay = String(dayIndex).padStart(2, "0");
-    const loopSeed = Number(`${year}${month}${loopDay}`);
-    const monthlyLift = Math.min(9, Math.floor((dayIndex - 1) * 0.5));
-    const dayVariation = seededNumber(loopSeed + 37) % 6;
-    const hourLift = includeTodayProgress ? Math.min(6, Math.floor(now.getHours() / 4)) : 6;
-    return clamp(10 + monthlyLift + dayVariation + hourLift, 10, 29);
-  };
-  const today = dailyCountFor(dateIndex, true);
-  const monthlyCountFor = (dayIndex, includeTodayProgress = false) => {
-    const loopDay = String(dayIndex).padStart(2, "0");
-    const loopSeed = Number(`${year}${month}${loopDay}`);
-    const dayLift = seededNumber(loopSeed + 49) % 2;
-    const progressLift = includeTodayProgress ? Math.min(1, Math.floor(now.getHours() / 12)) : 1;
-    return dayLift + progressLift;
-  };
-  const monthBase = 40 + (seededNumber(monthSeed + 11) % 5);
+
+  const monthBase = 42 + (seededNumber(monthSeed + 11) % 4);
+  const dailyBaseline = 12 + Math.floor((dateIndex - 1) * 0.72);
+  const steadyDailyLift = Math.floor((dayOfYear % 11) / 5);
+  const hourLift = Math.min(4, Math.floor(now.getHours() / 5));
+  const today = clamp(dailyBaseline + steadyDailyLift + hourLift, 12, 29);
+
   let monthly = monthBase;
   for (let dayIndex = 1; dayIndex <= dateIndex; dayIndex += 1) {
-    monthly += monthlyCountFor(dayIndex, dayIndex === dateIndex);
+    const loopDay = String(dayIndex).padStart(2, "0");
+    const loopSeed = Number(`${year}${month}${loopDay}`);
+    const stableDailyAdd = 2 + (seededNumber(loopSeed + 49) % 3);
+    const partialToday = dayIndex === dateIndex ? Math.min(stableDailyAdd, Math.ceil((now.getHours() + 1) / 8)) : stableDailyAdd;
+    monthly += partialToday;
   }
   const stability = 93 + (seededNumber(daySeed + dayOfYear) % 4);
 
@@ -468,10 +462,10 @@ function applyQuestionProfileToScores(scores) {
   };
   const habitAdjustments = {
     minimal: { hydration: -2, evenness: -1, shine: -1 },
-    basic: { hydration: 2, redness: 1 },
-    complete: { hydration: 3, evenness: 4, redness: 3, shine: 1 },
-    antioxidant: { hydration: 3, evenness: 5, redness: 3, shine: 2 },
-    clinical: { hydration: 2, evenness: 3, redness: 1 },
+    basic: { hydration: 1, redness: 1 },
+    complete: { hydration: 4, evenness: 4, redness: 3, shine: 1 },
+    antioxidant: { hydration: 4, evenness: 5, redness: 3, shine: 2 },
+    clinical: { hydration: 3, evenness: 3, redness: 2 },
   };
   const scenarioAdjustments = {
     makeup: { hydration: -1, shine: -1 },
@@ -511,15 +505,15 @@ function applyQuestionProfileToScores(scores) {
 
   const advancedHabitLift = {
     minimal: 0,
-    basic: 1,
-    complete: 2,
-    antioxidant: 3,
-    clinical: 2,
+    basic: 0.8,
+    complete: 3,
+    antioxidant: 4,
+    clinical: 3.2,
   }[customerProfile.routineHabitValue] || 0;
   const routineCommitmentLift = {
     simple: 0,
     daily: 1,
-    intensive: 2,
+    intensive: 2.2,
     completeCare: 3,
     flexible: 1,
   }[customerProfile.routinePaceValue] || 0;
@@ -540,16 +534,16 @@ function calibrateConsumerScoreRange(scores, maintainedSkinLift = 0) {
   const average = values.reduce((sum, score) => sum + score, 0) / values.length;
   const habitLift = {
     minimal: -1,
-    basic: 6,
-    complete: 14,
-    antioxidant: 17,
-    clinical: 14,
+    basic: 2,
+    complete: 9,
+    antioxidant: 12,
+    clinical: 10,
   }[customerProfile?.routineHabitValue] || 0;
   const paceLift = {
     simple: 0,
-    daily: 4,
-    intensive: 7,
-    completeCare: 9,
+    daily: 2,
+    intensive: 5,
+    completeCare: 7,
     flexible: 1,
   }[customerProfile?.routinePaceValue] || 0;
   const stressLoad = [
@@ -557,15 +551,15 @@ function calibrateConsumerScoreRange(scores, maintainedSkinLift = 0) {
     ...(customerProfile?.lifeValues || []),
     ...(customerProfile?.skinScenarioValues || []),
   ].length;
-  const skinSignalLift = clamp((maintainedSkinLift - 1.2) * 2.4, -2, 9);
-  const targetAverage = clamp(74 + habitLift + paceLift + skinSignalLift - Math.min(4, stressLoad * 0.28), 70, 92);
+  const skinSignalLift = clamp((maintainedSkinLift - 1.1) * 2.2, -2, 7);
+  const targetAverage = clamp(73 + habitLift + paceLift + skinSignalLift - Math.min(4, stressLoad * 0.28), 70, 90);
   const effectiveAverage = average < targetAverage
     ? targetAverage
-    : clamp(average + Math.max(0, habitLift + paceLift) * 0.34 + Math.max(0, maintainedSkinLift - 2) * 0.65, targetAverage, 96);
+    : clamp(average + Math.max(0, habitLift + paceLift) * 0.26 + Math.max(0, maintainedSkinLift - 2) * 0.55, targetAverage, 95);
 
   for (const key of Object.keys(adjusted)) {
-    const personalSpread = (adjusted[key] - average) * 0.9;
-    adjusted[key] = clamp(effectiveAverage + personalSpread, 64, 98);
+    const personalSpread = (adjusted[key] - average) * 0.82;
+    adjusted[key] = clamp(effectiveAverage + personalSpread, 66, 96);
   }
 
   return adjusted;
@@ -1391,22 +1385,23 @@ function analyzeSkin() {
   const { hydration, evenness, redness, shine } = finalScores;
   const longTermCareBonus = {
     minimal: 0,
-    basic: 1.2,
-    complete: 3.2,
+    basic: 0.6,
+    complete: 3.4,
     antioxidant: 4.2,
-    clinical: 3.4,
+    clinical: 3.6,
   }[customerProfile?.routineHabitValue] || 0;
   const commitmentBonus = {
     simple: 0,
-    daily: 0.8,
-    intensive: 1.5,
-    completeCare: 2,
+    daily: 0.7,
+    intensive: 1.6,
+    completeCare: 2.1,
     flexible: 0.4,
   }[customerProfile?.routinePaceValue] || 0;
   const stableSkinBonus = mode === "skin"
-    ? clamp(maintainedSkinLift * 1.35 + balancedLightBonus * 0.9 + Math.max(0, faceReadConfidence - 56) * 0.06 + longTermCareBonus + commitmentBonus - Math.max(0, sideBalance - 14) * 0.08, 0, 11)
+    ? clamp(maintainedSkinLift * 1.2 + balancedLightBonus * 0.8 + Math.max(0, faceReadConfidence - 58) * 0.045 + longTermCareBonus + commitmentBonus - Math.max(0, sideBalance - 14) * 0.08, 0, 9)
     : 0;
-  const overall = clamp(hydration * 0.25 + evenness * 0.32 + redness * 0.22 + shine * 0.21 + stableSkinBonus, 64, 99);
+  const overallBase = hydration * 0.25 + evenness * 0.32 + redness * 0.22 + shine * 0.21 + stableSkinBonus;
+  const overall = clamp(overallBase, 68, 96);
   const confidence = clamp(
     96
       - modePenalty * 3
@@ -2160,11 +2155,11 @@ function buildGrowthSystem(result, previousEnergy) {
 function getAgeBenchmark(result) {
   const ageValue = customerProfile?.ageValue || "30s";
   const benchmarks = {
-    under20: { range: "82-90", target: 86, label: "年輕肌理想維持參考", note: "此年齡層通常以油水平衡、清爽度與防曬習慣作為維持重點。" },
-    "20s": { range: "80-88", target: 84, label: "20+ 肌膚理想參考", note: "此年齡層建議把保濕、防曬與作息穩定做好，避免暗沉與油光反覆。" },
-    "30s": { range: "76-86", target: 81, label: "30+ 肌膚理想參考", note: "此年齡層可開始重視補水鎖水、透亮度與妝前穩定度。" },
-    "40s": { range: "72-82", target: 77, label: "40+ 肌膚理想參考", note: "此年齡層建議把修護、保濕與日間防護放在核心位置。" },
-    "50up": { range: "68-80", target: 74, label: "熟齡肌理想參考", note: "此年齡層可優先看重滋潤度、柔嫩感與屏障穩定。" },
+    under20: { range: "78-86", target: 82, label: "年輕肌建議維持參考", note: "此年齡層通常以油水平衡、清爽度與防曬習慣作為維持重點。" },
+    "20s": { range: "76-84", target: 80, label: "20+ 肌膚建議參考", note: "此年齡層建議把保濕、防曬與作息穩定做好，避免暗沉與油光反覆。" },
+    "30s": { range: "73-82", target: 77, label: "30+ 肌膚建議參考", note: "此年齡層可開始重視補水鎖水、透亮度與妝前穩定度。" },
+    "40s": { range: "70-79", target: 74, label: "40+ 肌膚建議參考", note: "此年齡層建議把修護、保濕與日間防護放在核心位置。" },
+    "50up": { range: "66-76", target: 71, label: "熟齡肌建議參考", note: "此年齡層可優先看重滋潤度、柔嫩感與屏障穩定。" },
   };
   const benchmark = benchmarks[ageValue] || benchmarks["30s"];
   const gap = Math.round(result.overall - benchmark.target);
