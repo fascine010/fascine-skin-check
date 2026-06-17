@@ -161,7 +161,7 @@ const scoreStatus = (score) => {
 const pct = (value) => `${Math.round(clamp(value))}%`;
 const displayScore = (score) => {
   const value = clamp(score, 1, 99);
-  return clamp(58 + Math.sqrt(value / 99) * 38 + value * 0.07, 60, 99);
+  return clamp(52 + Math.sqrt(value / 99) * 31 + value * 0.045, 52, 96);
 };
 
 function setJourneyStep(step, panel = null) {
@@ -203,24 +203,21 @@ function updateWelcomeStats() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   const daySeed = Number(`${year}${month}${day}`);
-  const monthSeed = Number(`${year}${month}`);
   const dateIndex = now.getDate();
   const dayOfYear = Math.floor((now - new Date(year, 0, 0)) / 86400000);
+  const statsStartDate = new Date(2026, 5, 17);
+  const daysSinceStatsStart = Math.max(0, Math.floor((new Date(year, now.getMonth(), dateIndex) - statsStartDate) / 86400000));
 
-  const monthBase = 42 + (seededNumber(monthSeed + 11) % 4);
-  const dailyBaseline = 12 + Math.floor((dateIndex - 1) * 0.72);
-  const steadyDailyLift = Math.floor((dayOfYear % 11) / 5);
-  const hourLift = Math.min(4, Math.floor(now.getHours() / 5));
-  const today = clamp(dailyBaseline + steadyDailyLift + hourLift, 12, 29);
-
-  let monthly = monthBase;
-  for (let dayIndex = 1; dayIndex <= dateIndex; dayIndex += 1) {
-    const loopDay = String(dayIndex).padStart(2, "0");
-    const loopSeed = Number(`${year}${month}${loopDay}`);
-    const stableDailyAdd = 2 + (seededNumber(loopSeed + 49) % 3);
-    const partialToday = dayIndex === dateIndex ? Math.min(stableDailyAdd, Math.ceil((now.getHours() + 1) / 8)) : stableDailyAdd;
-    monthly += partialToday;
+  let today = 66;
+  let monthly = 112;
+  for (let offset = 1; offset <= daysSinceStatsStart; offset += 1) {
+    const loopDate = new Date(statsStartDate);
+    loopDate.setDate(statsStartDate.getDate() + offset);
+    const loopSeed = Number(`${loopDate.getFullYear()}${String(loopDate.getMonth() + 1).padStart(2, "0")}${String(loopDate.getDate()).padStart(2, "0")}`);
+    today += 3 + (seededNumber(loopSeed + 31) % 4);
+    monthly += 5 + (seededNumber(loopSeed + 49) % 7);
   }
+
   const stability = 93 + (seededNumber(daySeed + dayOfYear) % 4);
 
   welcomeStats.today.textContent = formatNumber(today);
@@ -445,37 +442,37 @@ function applyQuestionProfileToScores(scores) {
 
   const adjusted = { ...scores };
   const concernAdjustments = {
-    hydration: { hydration: -4, shine: 1 },
-    evenness: { evenness: -4, redness: -1 },
-    redness: { redness: -4, hydration: -1 },
-    shine: { shine: -4, hydration: 1 },
-    texture: { hydration: -2, evenness: -2 },
-    fineLines: { hydration: -3, evenness: -1 },
+    hydration: { hydration: -6, shine: 1 },
+    evenness: { evenness: -6, redness: -1 },
+    redness: { redness: -6, hydration: -2 },
+    shine: { shine: -6, hydration: 1 },
+    texture: { hydration: -3, evenness: -3 },
+    fineLines: { hydration: -4, evenness: -2 },
   };
   const lifeAdjustments = {
-    sleep: { evenness: -2, redness: -1 },
-    stress: { redness: -2, shine: -1 },
-    busy: { hydration: -1, evenness: -1 },
-    diet: { shine: -2, evenness: -1 },
-    ac: { hydration: -3, redness: -1 },
-    selfcare: { hydration: -2, evenness: -2 },
+    sleep: { evenness: -3, redness: -2 },
+    stress: { redness: -3, shine: -2 },
+    busy: { hydration: -2, evenness: -2 },
+    diet: { shine: -3, evenness: -2 },
+    ac: { hydration: -4, redness: -2 },
+    selfcare: { hydration: -4, evenness: -3 },
   };
   const habitAdjustments = {
-    minimal: { hydration: -2, evenness: -1, shine: -1 },
+    minimal: { hydration: -5, evenness: -3, shine: -2 },
     basic: { hydration: 1, redness: 1 },
     complete: { hydration: 4, evenness: 4, redness: 3, shine: 1 },
     antioxidant: { hydration: 4, evenness: 5, redness: 3, shine: 2 },
     clinical: { hydration: 3, evenness: 3, redness: 2 },
   };
   const scenarioAdjustments = {
-    makeup: { hydration: -1, shine: -1 },
-    bare: { evenness: -2 },
-    season: { redness: -2, hydration: -1 },
-    stress: { evenness: -2, redness: -1 },
-    ageing: { hydration: -2, evenness: -1 },
+    makeup: { hydration: -2, shine: -2 },
+    bare: { evenness: -3 },
+    season: { redness: -3, hydration: -2 },
+    stress: { evenness: -3, redness: -2 },
+    ageing: { hydration: -3, evenness: -2 },
   };
   const paceAdjustments = {
-    simple: { hydration: 1, redness: 1 },
+    simple: { hydration: -1 },
     daily: { hydration: 2, evenness: 2 },
     intensive: { hydration: 3, evenness: 2, redness: 2 },
     completeCare: { hydration: 4, evenness: 3, redness: 3, shine: 1 },
@@ -533,33 +530,33 @@ function calibrateConsumerScoreRange(scores, maintainedSkinLift = 0) {
   const values = Object.values(adjusted);
   const average = values.reduce((sum, score) => sum + score, 0) / values.length;
   const habitLift = {
-    minimal: -1,
-    basic: 2,
-    complete: 9,
-    antioxidant: 12,
-    clinical: 10,
+    minimal: -2,
+    basic: 4,
+    complete: 10,
+    antioxidant: 13,
+    clinical: 11,
   }[customerProfile?.routineHabitValue] || 0;
   const paceLift = {
-    simple: 0,
-    daily: 2,
+    simple: -1,
+    daily: 3,
     intensive: 5,
     completeCare: 7,
-    flexible: 1,
+    flexible: 0,
   }[customerProfile?.routinePaceValue] || 0;
   const stressLoad = [
     ...(customerProfile?.concernValues || []),
     ...(customerProfile?.lifeValues || []),
     ...(customerProfile?.skinScenarioValues || []),
   ].length;
-  const skinSignalLift = clamp((maintainedSkinLift - 1.1) * 2.2, -2, 7);
-  const targetAverage = clamp(73 + habitLift + paceLift + skinSignalLift - Math.min(4, stressLoad * 0.28), 70, 90);
+  const skinSignalLift = clamp((maintainedSkinLift - 1.2) * 2.1, -2, 8);
+  const targetAverage = clamp(72 + habitLift + paceLift + skinSignalLift - Math.min(4, stressLoad * 0.28), 68, 91);
   const effectiveAverage = average < targetAverage
     ? targetAverage
-    : clamp(average + Math.max(0, habitLift + paceLift) * 0.26 + Math.max(0, maintainedSkinLift - 2) * 0.55, targetAverage, 95);
+    : clamp(average + Math.max(0, habitLift + paceLift) * 0.24 + Math.max(0, maintainedSkinLift - 2) * 0.55, targetAverage, 96);
 
   for (const key of Object.keys(adjusted)) {
-    const personalSpread = (adjusted[key] - average) * 0.82;
-    adjusted[key] = clamp(effectiveAverage + personalSpread, 66, 96);
+    const personalSpread = (adjusted[key] - average) * 1.05;
+    adjusted[key] = clamp(effectiveAverage + personalSpread, 64, 98);
   }
 
   return adjusted;
@@ -604,8 +601,8 @@ function spreadCloseMetricScores(scores, concernSignals) {
   const ordered = Object.keys(nextScores)
     .map((key) => ({ key, signal: concernSignals[key] ?? 0 }))
     .sort((a, b) => b.signal - a.signal);
-  const offsets = [-6.4, -2.2, 2.2, 6.4];
-  const center = Math.max(58, ordered.reduce((sum, item) => sum + nextScores[item.key], 0) / ordered.length + 3);
+  const offsets = [-7.8, -2.8, 2.8, 7.8];
+  const center = Math.max(56, ordered.reduce((sum, item) => sum + nextScores[item.key], 0) / ordered.length + 1.2);
 
   ordered.forEach((item, index) => {
     const naturalPull = clamp(((concernSignals[item.key] ?? 0) - 50) * -0.055, -2.1, 2.1);
@@ -1393,23 +1390,23 @@ function analyzeSkin() {
   const { hydration, evenness, redness, shine } = finalScores;
   const longTermCareBonus = {
     minimal: 0,
-    basic: 0.6,
-    complete: 3.4,
-    antioxidant: 4.2,
+    basic: 0.8,
+    complete: 3.2,
+    antioxidant: 4.3,
     clinical: 3.6,
   }[customerProfile?.routineHabitValue] || 0;
   const commitmentBonus = {
     simple: 0,
-    daily: 0.7,
+    daily: 0.8,
     intensive: 1.6,
-    completeCare: 2.1,
-    flexible: 0.4,
+    completeCare: 2.3,
+    flexible: 0.2,
   }[customerProfile?.routinePaceValue] || 0;
   const stableSkinBonus = mode === "skin"
-    ? clamp(maintainedSkinLift * 1.2 + balancedLightBonus * 0.8 + Math.max(0, faceReadConfidence - 58) * 0.045 + longTermCareBonus + commitmentBonus - Math.max(0, sideBalance - 14) * 0.08, 0, 9)
+    ? clamp(maintainedSkinLift * 1.05 + balancedLightBonus * 0.7 + Math.max(0, faceReadConfidence - 62) * 0.035 + longTermCareBonus + commitmentBonus - Math.max(0, sideBalance - 14) * 0.08, 0, 9.5)
     : 0;
   const overallBase = hydration * 0.25 + evenness * 0.32 + redness * 0.22 + shine * 0.21 + stableSkinBonus;
-  const overall = clamp(overallBase, 68, 96);
+  const overall = clamp(overallBase, 66, 98);
   const confidence = clamp(
     96
       - modePenalty * 3
