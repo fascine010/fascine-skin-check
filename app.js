@@ -407,17 +407,17 @@ function hasScenario(value) {
 }
 
 function collectCustomerProfile() {
-  const ageValue = selectedRadioValue("ageRange") || "20s";
+  const ageValue = selectedRadioValue("ageRange");
   const lifeValues = selectedCheckboxValues("lifeFactor");
   const lifeLabels = lifeValues.map((value) => consultationLabels.lifeFactor[value]).filter(Boolean);
   const concernValues = selectedCheckboxValues("skinConcern");
   const concernValue = concernValues[0] || "";
   const concernLabels = concernValues.map((value) => consultationLabels.skinConcern[value]).filter(Boolean);
-  const routineHabitValue = selectedRadioValue("routineHabit") || "basic";
+  const routineHabitValue = selectedRadioValue("routineHabit");
   const skinScenarioValues = selectedCheckboxValues("skinScenario");
-  const skinScenarioValue = skinScenarioValues[0] || "bare";
+  const skinScenarioValue = skinScenarioValues[0] || "";
   const skinScenarioLabels = skinScenarioValues.map((value) => consultationLabels.skinScenario[value]).filter(Boolean);
-  const routinePaceValue = selectedRadioValue("routinePace") || "simple";
+  const routinePaceValue = selectedRadioValue("routinePace");
 
   return {
     lifeValues,
@@ -430,13 +430,13 @@ function collectCustomerProfile() {
     concernLabel: concernLabels.join("、"),
     concernLabels,
     routineHabitValue,
-    routineHabitLabel: consultationLabels.routineHabit[routineHabitValue],
+    routineHabitLabel: consultationLabels.routineHabit[routineHabitValue] || "",
     skinScenarioValue,
     skinScenarioValues,
-    skinScenarioLabel: skinScenarioLabels.join("、") || consultationLabels.skinScenario[skinScenarioValue],
+    skinScenarioLabel: skinScenarioLabels.join("、"),
     skinScenarioLabels,
     routinePaceValue,
-    routinePaceLabel: consultationLabels.routinePace[routinePaceValue],
+    routinePaceLabel: consultationLabels.routinePace[routinePaceValue] || "",
   };
 }
 
@@ -623,7 +623,15 @@ function updateStartAnalysisState() {
     viewResultButton.textContent = "下一步：回答膚況問題";
   }
   const profile = collectCustomerProfile();
-  const isReady = Boolean(loadedImage && profile.ageValue && profile.concernValues.length);
+  const isReady = Boolean(
+    loadedImage &&
+      profile.lifeValues.length &&
+      profile.ageValue &&
+      profile.concernValues.length &&
+      profile.routineHabitValue &&
+      profile.skinScenarioValues.length &&
+      profile.routinePaceValue,
+  );
   startAnalysisButton.disabled = !isReady;
 }
 
@@ -3274,8 +3282,9 @@ async function handleImage(file, source = "upload") {
     resetPhotoAdjust();
     resetFaceGuide();
     drawImageCover(loadedImage);
-    const fitted = autoFitPhotoToFace();
-    const detected = fitted || await autoDetectFaceGuide();
+    const detected = source === "camera"
+      ? Boolean(getSkinDetectionBox())
+      : autoFitPhotoToFace() || await autoDetectFaceGuide();
     preparePhotoForConsultation(fileName, detected);
   };
 
