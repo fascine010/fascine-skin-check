@@ -214,8 +214,8 @@ function updateWelcomeStats() {
     const loopDate = new Date(statsStartDate);
     loopDate.setDate(statsStartDate.getDate() + offset);
     const loopSeed = Number(`${loopDate.getFullYear()}${String(loopDate.getMonth() + 1).padStart(2, "0")}${String(loopDate.getDate()).padStart(2, "0")}`);
-    today += 3 + (seededNumber(loopSeed + 31) % 4);
-    monthly += 5 + (seededNumber(loopSeed + 49) % 7);
+    today += 8 + (seededNumber(loopSeed + 31) % 6);
+    monthly += 2 + (seededNumber(loopSeed + 49) % 3);
   }
 
   const stability = 93 + (seededNumber(daySeed + dayOfYear) % 4);
